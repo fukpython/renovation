@@ -650,6 +650,143 @@ createApp({
       openStageModal(stage);
     }
 
+    // ==================== 工期任务拖拽排序 ====================
+
+    const taskDragState = reactive({
+      isDragging: false,
+      dragOccurred: false,
+      taskId: null,
+      startIdx: -1,
+      targetIdx: -1,
+      startY: 0,
+      offsetY: 0,
+      timer: null
+    });
+
+    function onTaskDragStart(e, task, idx) {
+      if (taskDragState.isDragging) return;
+      if (scheduleFilter.value !== 'all') return;
+      taskDragState.taskId = task.id;
+      taskDragState.startIdx = idx;
+      taskDragState.startY = e.touches[0].clientY;
+      taskDragState.timer = setTimeout(() => {
+        taskDragState.isDragging = true;
+        taskDragState.dragOccurred = true;
+        if (navigator.vibrate) navigator.vibrate(30);
+      }, 500);
+    }
+
+    function onTaskDragMove(e) {
+      if (!taskDragState.isDragging) {
+        if (taskDragState.timer && Math.abs(e.touches[0].clientY - taskDragState.startY) > 10) {
+          clearTimeout(taskDragState.timer);
+          taskDragState.timer = null;
+        }
+        return;
+      }
+      e.preventDefault();
+      const touch = e.touches[0];
+      taskDragState.offsetY = touch.clientY - taskDragState.startY;
+      updateTaskDragTarget(touch.clientY);
+    }
+
+    function onTaskDragEnd() {
+      if (taskDragState.timer) {
+        clearTimeout(taskDragState.timer);
+        taskDragState.timer = null;
+      }
+      if (taskDragState.isDragging) {
+        commitTaskReorder();
+      }
+      setTimeout(() => { taskDragState.dragOccurred = false; }, 200);
+      taskDragState.isDragging = false;
+      taskDragState.taskId = null;
+      taskDragState.startIdx = -1;
+      taskDragState.targetIdx = -1;
+      taskDragState.offsetY = 0;
+    }
+
+    function onMouseTaskDragStart(e, task, idx) {
+      e.preventDefault();
+      taskDragState.taskId = task.id;
+      taskDragState.startIdx = idx;
+      taskDragState.startY = e.clientY;
+      taskDragState.isDragging = true;
+      taskDragState.dragOccurred = true;
+
+      const onMove = (ev) => {
+        taskDragState.offsetY = ev.clientY - taskDragState.startY;
+        updateTaskDragTarget(ev.clientY);
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        commitTaskReorder();
+        setTimeout(() => { taskDragState.dragOccurred = false; }, 200);
+        taskDragState.isDragging = false;
+        taskDragState.taskId = null;
+        taskDragState.startIdx = -1;
+        taskDragState.targetIdx = -1;
+        taskDragState.offsetY = 0;
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    }
+
+    function updateTaskDragTarget(clientY) {
+      const cards = document.querySelectorAll("[data-task-drag-id]");
+      let found = -1;
+      for (let i = 0; i < cards.length; i++) {
+        const rect = cards[i].getBoundingClientRect();
+        if (rect.height === 0) continue;
+        const midY = rect.top + rect.height / 2;
+        if (clientY < midY) {
+          found = i;
+          break;
+        }
+      }
+      if (found === -1) found = cards.length - 1;
+      if (found !== taskDragState.targetIdx) {
+        taskDragState.targetIdx = found;
+      }
+    }
+
+    function commitTaskReorder() {
+      if (taskDragState.targetIdx === -1 || taskDragState.targetIdx === taskDragState.startIdx) return;
+      const moved = tasks.splice(taskDragState.startIdx, 1)[0];
+      let insertAt = taskDragState.targetIdx;
+      if (insertAt > taskDragState.startIdx) insertAt--;
+      tasks.splice(insertAt, 0, moved);
+      saveAll();
+      showToast("顺序已更新");
+    }
+
+    function onTaskClick(task) {
+      if (taskDragState.dragOccurred) return;
+      openTaskModal(task);
+    }
+
+    // ==================== 总预算编辑 ====================
+
+    const showBudgetEditModal = ref(false);
+    const editingTotalBudget = ref(0);
+
+    const totalAllocatedBudget = computed(() => {
+      return budget.reduce((sum, item) => sum + (Number(item.budgetAmount) || 0), 0);
+    });
+
+    function openBudgetEditModal() {
+      editingTotalBudget.value = project.totalBudget;
+      showBudgetEditModal.value = true;
+    }
+
+    function saveTotalBudget() {
+      project.totalBudget = editingTotalBudget.value;
+      showBudgetEditModal.value = false;
+      saveAll();
+      showToast("总预算已更新");
+    }
+
     // ==================== 现场照片 ====================
 
     const photoFilter = ref("all");
@@ -1093,6 +1230,7 @@ createApp({
       showTaskModal, editingTask,
       showExpenseModal, editingExpense,
       showProjectModal, editingProject, openProjectModal, saveProject,
+      showBudgetEditModal, editingTotalBudget, openBudgetEditModal, saveTotalBudget,
       showStageModal, editingStage, openAddStageModal, deleteStage,
       showPhotoDetail, viewingPhoto,
       showPhotoUpload, newPhoto, photoInput,
@@ -1100,6 +1238,7 @@ createApp({
       // 计算属性
       overallProgress, daysElapsed, daysRemaining, completedStages,
       currentStage, totalSpent, remainingBudget, budgetProgress,
+      totalAllocatedBudget,
       budgetCategories, categoryNames, recentPhotos, upcomingTasks,
       // 方法
       statusText, formatMoney,
@@ -1113,9 +1252,12 @@ createApp({
       syncStatus, lastSyncTime, isSyncing, retryConnect,
       // 导出导入
       exportData, importData,
-      // 拖拽排序
+      // 拖拽排序 - 流程
       dragState, onDragStart, onDragMove, onDragEnd,
-      onMouseDragStart, onStageClick
+      onMouseDragStart, onStageClick,
+      // 拖拽排序 - 工期
+      taskDragState, onTaskDragStart, onTaskDragMove, onTaskDragEnd,
+      onMouseTaskDragStart, onTaskClick
     };
   }
 }).mount("#app");
