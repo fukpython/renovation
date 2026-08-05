@@ -151,6 +151,7 @@ function saveData(data) {
 
     // 照片存储优化：如果数据太大，压缩旧照片
     let jsonStr = JSON.stringify(data);
+    console.log("[存储] 数据大小:", (jsonStr.length / 1024).toFixed(1), "KB, 照片:", data.photos.length, "张");
     if (jsonStr.length > 4 * 1024 * 1024) {
       // 超过4MB，删除最旧的照片直到降到3MB以下
       while (jsonStr.length > 3 * 1024 * 1024 && data.photos.length > 10) {
@@ -170,7 +171,7 @@ function saveData(data) {
         data.photos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
         data.photos = data.photos.slice(0, Math.ceil(data.photos.length / 2));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        console.log("[存储] 紧急清理照片");
+        console.log("[存储] 紧急清理照片，剩余", data.photos.length, "张");
       } catch (e2) {
         console.error("存储彻底失败:", e2);
       }
@@ -200,20 +201,52 @@ function daysBetween(start, end) {
 /* ===================== 图片压缩 ===================== */
 
 function compressImage(file, callback) {
+  console.log("[照片] 开始压缩:", file.name, file.type, file.size, "bytes");
+
+  // 如果不是图片类型，直接用 FileReader
+  if (!file.type.startsWith("image/")) {
+    console.log("[照片] 非图片文件，跳过压缩");
+    const reader = new FileReader();
+    reader.onload = function(event) { callback(event.target.result); };
+    reader.onerror = function() {
+      console.error("[照片] FileReader 失败");
+      callback(null);
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+
   const reader = new FileReader();
+  reader.onerror = function() {
+    console.error("[照片] FileReader 读取失败");
+    callback(null);
+  };
   reader.onload = function(event) {
     const img = new Image();
+    img.onerror = function() {
+      console.error("[照片] Image 加载失败，使用原始 dataURL");
+      // 回退：直接用 FileReader 的结果
+      callback(event.target.result);
+    };
     img.onload = function() {
-      const canvas = document.createElement("canvas");
-      const maxW = 480, maxH = 360;
-      let w = img.width, h = img.height;
-      if (w > maxW) { h = h * maxW / w; w = maxW; }
-      if (h > maxH) { w = w * maxH / h; h = maxH; }
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL("image/jpeg", 0.4));
+      try {
+        const canvas = document.createElement("canvas");
+        const maxW = 480, maxH = 360;
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = h * maxW / w; w = maxW; }
+        if (h > maxH) { w = w * maxH / h; h = maxH; }
+        canvas.width = Math.max(1, Math.round(w));
+        canvas.height = Math.max(1, Math.round(h));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const result = canvas.toDataURL("image/jpeg", 0.4);
+        console.log("[照片] 压缩完成:", result.length, "chars");
+        callback(result);
+      } catch (e) {
+        console.error("[照片] Canvas 压缩失败:", e);
+        // 回退：使用原始 dataURL
+        callback(event.target.result);
+      }
     };
     img.src = event.target.result;
   };
@@ -1044,13 +1077,32 @@ createApp({
     });
 
     function triggerPhotoUpload() {
-      photoInput.value?.click();
+      console.log("[照片] triggerPhotoUpload 被调用, photoInput:", photoInput.value);
+      if (photoInput.value) {
+        photoInput.value.click();
+      } else {
+        // fallback: 创建临时 input
+        console.log("[照片] photoInput ref 为空，使用 fallback");
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.multiple = true;
+        input.style.display = "none";
+        input.onchange = function(e) { handlePhotoUpload(e); };
+        document.body.appendChild(input);
+        input.click();
+        setTimeout(function() { document.body.removeChild(input); }, 1000);
+      }
     }
 
     // 批量上传 (任务17)
     function handlePhotoUpload(e) {
-      const files = Array.from(e.target.files);
-      if (!files || files.length === 0) return;
+      var files = Array.from(e.target.files);
+      console.log("[照片] 选择文件:", files.length, "个");
+      if (!files || files.length === 0) {
+        console.log("[照片] 没有选择文件");
+        return;
+      }
 
       batchPhotoQueue.value = files;
       batchPhotoIndex.value = 0;
@@ -1070,12 +1122,19 @@ createApp({
 
       const file = batchPhotoQueue.value[batchPhotoIndex.value];
       compressImage(file, (dataUrl) => {
+        if (!dataUrl) {
+          console.error("[照片] 压缩失败，跳过此张");
+          showToast("照片处理失败，已跳过");
+          skipPhoto();
+          return;
+        }
         const cs = currentStage.value;
         newPhoto.url = dataUrl;
-        newPhoto.stage = cs ? cs.name : (stages[0]?.name || "");
+        newPhoto.stage = cs ? cs.name : (stages[0] ? stages[0].name : "");
         newPhoto.uploadBy = "";
         newPhoto.description = "";
         showPhotoUpload.value = true;
+        console.log("[照片] 上传弹窗已显示");
       });
     }
 
@@ -1088,35 +1147,43 @@ createApp({
         showToast("请填写上传人");
         return;
       }
-      const photo = {
-        id: Date.now() + Math.random(),
-        url: newPhoto.url,
-        stage: newPhoto.stage,
-        uploadBy: newPhoto.uploadBy,
-        description: newPhoto.description,
-        uploadDate: todayStr()
-      };
-      photos.push(photo);
-      addLog("add", "上传照片：" + newPhoto.stage + (newPhoto.description ? " - " + newPhoto.description : ""));
-      showPhotoUpload.value = false;
+      try {
+        const photo = {
+          id: Date.now() + Math.random(),
+          url: newPhoto.url,
+          stage: newPhoto.stage,
+          uploadBy: newPhoto.uploadBy,
+          description: newPhoto.description,
+          uploadDate: todayStr()
+        };
+        photos.push(photo);
+        addLog("add", "上传照片：" + newPhoto.stage + (newPhoto.description ? " - " + newPhoto.description : ""));
+        showPhotoUpload.value = false;
 
-      const currentBatchIndex = batchPhotoIndex.value;
+        var currentBatchIndex = batchPhotoIndex.value;
 
-      // 重置
-      newPhoto.url = "";
-      newPhoto.uploadBy = "";
-      newPhoto.description = "";
+        // 重置
+        newPhoto.url = "";
+        newPhoto.uploadBy = "";
+        newPhoto.description = "";
 
-      saveAll();
+        saveAll();
+        console.log("[照片] 保存成功");
 
-      // 如果是批量上传，处理下一张
-      if (batchPhotoQueue.value.length > 0 && currentBatchIndex < batchPhotoQueue.value.length - 1) {
-        batchPhotoIndex.value = currentBatchIndex + 1;
-        setTimeout(() => processNextBatchPhoto(), 300);
-      } else {
-        showToast("上传成功");
-        batchPhotoQueue.value = [];
-        batchPhotoIndex.value = 0;
+        // 如果是批量上传，处理下一张
+        if (batchPhotoQueue.value.length > 0 && currentBatchIndex < batchPhotoQueue.value.length - 1) {
+          batchPhotoIndex.value = currentBatchIndex + 1;
+          setTimeout(function() { processNextBatchPhoto(); }, 300);
+        } else {
+          showToast("上传成功");
+          batchPhotoQueue.value = [];
+          batchPhotoIndex.value = 0;
+        }
+      } catch (e) {
+        console.error("[照片] 保存失败:", e);
+        showToast("保存失败：" + (e.name === "QuotaExceededError" ? "存储空间不足" : e.message));
+        // 回退：移除刚添加的照片
+        if (photos.length > 0) photos.pop();
       }
     }
 
