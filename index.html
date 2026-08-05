@@ -9,13 +9,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<!-- 加载界面放在 #app 外面，避免被 v-cloak 隐藏 -->
+<div id="__loadingScreen" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;font-family:sans-serif;color:#999;">
+  <div style="width:32px;height:32px;border:3px solid #07c160;border-top-color:transparent;border-radius:50%;animation:__spin 0.8s linear infinite;"></div>
+  <div>装修管家加载中...</div>
+</div>
+<style>#__loadingScreen{opacity:1;transition:opacity 0.3s}@keyframes __spin{to{transform:rotate(360deg)}}</style>
+
 <div id="app" v-cloak>
-  <!-- Vue 加载前的占位符，Vue mount 后会被替换 -->
-  <div id="__loadingScreen" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;font-family:sans-serif;color:#999;">
-    <div style="width:32px;height:32px;border:3px solid #07c160;border-top-color:transparent;border-radius:50%;animation:__spin 0.8s linear infinite;"></div>
-    <div>装修管家加载中...</div>
-  </div>
-  <style>#__loadingScreen{opacity:1;transition:opacity 0.3s}@keyframes __spin{to{transform:rotate(360deg)}}</style>
 
   <!-- ===================== 顶部状态栏 ===================== -->
   <div class="status-bar">
@@ -1003,11 +1004,10 @@ var __appStarted = false;
 function loadScript(url, onSuccess, onError, timeout) {
   var script = document.createElement('script');
   script.src = url;
-  script.crossOrigin = 'anonymous';
   var done = false;
   var timer = setTimeout(function() {
     if (!done) { done = true; script.onload = script.onerror = null; onError(); }
-  }, timeout || 8000);
+  }, timeout || 6000);
   script.onload = function() {
     if (done) return;
     done = true; clearTimeout(timer);
@@ -1039,49 +1039,52 @@ function tryLoadVue(idx) {
   }, function() {
     console.warn('[CDN] Vue加载失败，尝试下一个:', VUE_CDNS[idx]);
     tryLoadVue(idx + 1);
-  }, 8000);
+  }, 6000);
 }
 
 function tryLoadMqtt(idx) {
   if (idx >= MQTT_CDNS.length) {
     console.warn('[CDN] MQTT所有CDN均不可用，云同步功能将不可用');
-    __mqttReady = true; // 允许继续，只是没有云同步
-    tryStartApp();
+    __mqttReady = true;
     return;
   }
   console.log('[CDN] 尝试加载MQTT:', MQTT_CDNS[idx]);
   loadScript(MQTT_CDNS[idx], function() {
     console.log('[CDN] MQTT加载成功:', MQTT_CDNS[idx]);
     __mqttReady = true;
-    tryStartApp();
   }, function() {
     console.warn('[CDN] MQTT加载失败，尝试下一个:', MQTT_CDNS[idx]);
     tryLoadMqtt(idx + 1);
-  }, 8000);
+  }, 6000);
 }
 
 function tryStartApp() {
   if (__appStarted) return;
-  if (!__vueReady) return; // Vue必须加载
-  if (!__mqttReady) return; // 等MQTT也完成（成功或失败都算完成）
+  if (!__vueReady) return;
   __appStarted = true;
-  console.log('[启动] Vue+MQTT就绪，加载app.js');
-  loadScript('app.js', function() {
+  console.log('[启动] Vue就绪，加载app.js');
+  // 加缓存破坏参数，避免浏览器加载旧缓存
+  loadScript('app.js?v=20260805c', function() {
     console.log('[启动] app.js加载完成');
   }, function() {
     window.__showError('app.js加载失败，请刷新页面重试。');
   }, 10000);
 }
 
-// 超时检测：20秒后如果加载界面还在，说明整体加载失败
+// 超时检测：15秒后如果加载界面还在，提示用户
 setTimeout(function() {
   var ls = document.getElementById('__loadingScreen');
   if (ls && ls.style.display !== 'none') {
-    window.__showError('应用加载超时。可能原因：1)网络较慢，请耐心等待或刷新 2)CDN被墙，请尝试切换网络 3)浏览器存储数据过大，可清除站点数据后重试。');
+    var msg = '应用加载超时。请尝试：\n';
+    msg += '1. 清除浏览器缓存后刷新\n';
+    msg += '2. 用无痕模式打开\n';
+    msg += '3. 清除站点数据（设置→隐私→清除浏览数据）\n';
+    msg += '4. 切换网络（WiFi/流量）';
+    window.__showError(msg);
   }
-}, 20000);
+}, 15000);
 
-// 并行加载Vue和MQTT
+// 优先加载Vue（关键路径），MQTT后台加载（非关键路径）
 tryLoadVue(0);
 tryLoadMqtt(0);
 </script>
