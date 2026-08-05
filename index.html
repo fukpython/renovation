@@ -214,14 +214,34 @@
         <div class="filter-tab" :class="{ active: scheduleFilter === 'completed' }" @click="scheduleFilter = 'completed'">已完成</div>
       </div>
 
+      <!-- 拖拽提示 -->
+      <div class="drag-hint" v-if="scheduleFilter === 'all' && tasks.length > 1">
+        <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        <span>长按任务卡片可拖动调整顺序</span>
+      </div>
+
       <!-- 任务列表 -->
       <div class="task-list">
-        <div class="task-card" v-for="task in filteredTasks" :key="task.id">
+        <div class="task-card" v-for="(task, idx) in filteredTasks" :key="task.id"
+          :data-task-drag-id="task.id"
+          :class="{
+            'is-dragging': taskDragState.isDragging && taskDragState.taskId === task.id,
+            'is-drag-target': taskDragState.isDragging && taskDragState.targetIdx === idx && taskDragState.taskId !== task.id
+          }"
+          :style="taskDragState.isDragging && taskDragState.taskId === task.id
+            ? { transform: 'translateY(' + taskDragState.offsetY + 'px) scale(1.03)', zIndex: 100 }
+            : (taskDragState.isDragging && taskDragState.targetIdx === idx && taskDragState.taskId !== task.id
+              ? { transform: 'translateY(' + (taskDragState.startIdx > idx ? 8 : -8) + 'px)' }
+              : null)"
+          @touchstart.passive="scheduleFilter === 'all' && onTaskDragStart($event, task, idx)"
+          @touchmove="onTaskDragMove"
+          @touchend="onTaskDragEnd"
+          @touchcancel="onTaskDragEnd">
           <div class="task-timeline">
             <div class="task-dot" :class="'dot-' + task.status"></div>
             <div class="task-line" v-if="filteredTasks.indexOf(task) < filteredTasks.length - 1"></div>
           </div>
-          <div class="task-body">
+          <div class="task-body" @click="onTaskClick(task)">
             <div class="task-header">
               <span class="task-name">{{ task.name }}</span>
               <span class="task-status-badge" :class="'status-' + task.status">{{ statusText(task.status) }}</span>
@@ -238,10 +258,17 @@
               <span class="task-progress-text">{{ task.progress }}%</span>
             </div>
             <div class="task-actions">
-              <button class="btn-xs btn-primary" v-if="task.status === 'pending'" @click="startTask(task)">开始</button>
-              <button class="btn-xs btn-success" v-if="task.status === 'in-progress'" @click="completeTask(task)">完成</button>
-              <button class="btn-xs btn-default" @click="openTaskModal(task)">编辑</button>
-              <button class="btn-xs btn-danger-text" @click="deleteTask(task)">删除</button>
+              <button class="btn-xs btn-primary" v-if="task.status === 'pending'" @click.stop="startTask(task)">开始</button>
+              <button class="btn-xs btn-success" v-if="task.status === 'in-progress'" @click.stop="completeTask(task)">完成</button>
+              <button class="btn-xs btn-default" @click.stop="openTaskModal(task)">编辑</button>
+              <button class="btn-xs btn-danger-text" @click.stop="deleteTask(task)">删除</button>
+            </div>
+            <!-- 桌面端拖拽手柄 -->
+            <div class="drag-handle task-drag-handle"
+              v-if="scheduleFilter === 'all'"
+              @mousedown.stop="onMouseTaskDragStart($event, task, idx)"
+              @touchstart.stop>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
             </div>
           </div>
         </div>
@@ -265,7 +292,12 @@
       <div class="budget-summary-card">
         <div class="budget-summary-row">
           <div class="budget-summary-item">
-            <div class="budget-summary-label">总预算</div>
+            <div class="budget-summary-label">
+              总预算
+              <span class="edit-budget-btn" @click="openBudgetEditModal">
+                <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+              </span>
+            </div>
             <div class="budget-summary-value">{{ formatMoney(project.totalBudget) }}</div>
           </div>
           <div class="budget-summary-item">
@@ -284,6 +316,16 @@
         <div class="budget-summary-text">
           预算使用率 {{ budgetProgress.toFixed(1) }}%
           <span v-if="budgetProgress > 100" class="over-budget-tag">已超支 {{ formatMoney(totalSpent - project.totalBudget) }}</span>
+        </div>
+        <!-- 已分配预算 -->
+        <div class="budget-allocated-info" v-if="totalAllocatedBudget > 0">
+          <span class="allocated-label">已分配预算</span>
+          <span class="allocated-value" :class="{ 'over-budget': totalAllocatedBudget > project.totalBudget }">
+            {{ formatMoney(totalAllocatedBudget) }} / {{ formatMoney(project.totalBudget) }}
+          </span>
+          <span class="allocated-pct" :class="{ 'over-budget': totalAllocatedBudget > project.totalBudget }">
+            {{ project.totalBudget > 0 ? ((totalAllocatedBudget / project.totalBudget) * 100).toFixed(0) : 0 }}%
+          </span>
         </div>
       </div>
 
@@ -566,6 +608,32 @@
       <div class="modal-footer">
         <button class="btn-modal btn-cancel" @click="showProjectModal = false">取消</button>
         <button class="btn-modal btn-confirm" @click="saveProject">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 总预算编辑弹窗 -->
+  <div class="modal-overlay" v-if="showBudgetEditModal" @click.self="showBudgetEditModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">设置总预算</span>
+        <span class="modal-close" @click="showBudgetEditModal = false">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>总预算金额（元）</label>
+          <input type="number" v-model.number="editingTotalBudget" placeholder="如：250000" />
+        </div>
+        <div class="budget-edit-hint" v-if="totalAllocatedBudget > 0">
+          当前各分类预算合计：{{ formatMoney(totalAllocatedBudget) }}
+          <span v-if="totalAllocatedBudget > editingTotalBudget" class="over-budget">
+            （超出总预算 {{ formatMoney(totalAllocatedBudget - editingTotalBudget) }}）
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-cancel" @click="showBudgetEditModal = false">取消</button>
+        <button class="btn-modal btn-confirm" @click="saveTotalBudget">保存</button>
       </div>
     </div>
   </div>
