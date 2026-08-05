@@ -1255,10 +1255,21 @@ const __vueApp = createApp({
       }
     }
 
+    var photoDeleteConfirm = ref(false);
     function deletePhoto(photo) {
-      if (!confirm("确认删除这张照片？")) return;
-      const idx = photos.findIndex(p => p.id === photo.id);
-      if (idx > -1) photos.splice(idx, 1);
+      if (!photoDeleteConfirm.value) {
+        photoDeleteConfirm.value = true;
+        setTimeout(function() { photoDeleteConfirm.value = false; }, 3000);
+        return;
+      }
+      photoDeleteConfirm.value = false;
+      var pid = photo.id;
+      for (var i = 0; i < photos.length; i++) {
+        if (photos[i].id === pid) {
+          photos.splice(i, 1);
+          break;
+        }
+      }
       showPhotoDetail.value = false;
       addLog("delete", "删除照片");
       saveAll();
@@ -1720,7 +1731,7 @@ const __vueApp = createApp({
       openCategoryModal, addCategory, deleteCategory,
       openStageModal, saveStage, startStage, completeStage,
       triggerPhotoUpload, handlePhotoUpload, savePhoto, skipPhoto,
-      openPhotoDetail, savePhotoDescription, deletePhoto,
+      openPhotoDetail, savePhotoDescription, deletePhoto, photoDeleteConfirm,
       showToast,
       // 验收
       getAcceptanceItems, toggleAcceptance, isAccepted, getAcceptanceProgress,
