@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>装修管家</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <!-- ===================== 顶部状态栏 ===================== -->
+  <div class="status-bar">
+    <span class="status-time">{{ currentTime }}</span>
+    <div class="status-icons">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+
+  <!-- ===================== 导航栏 ===================== -->
+  <div class="nav-bar">
+    <div class="nav-title">{{ navTitle }}</div>
+    <div class="sync-indicator" :class="'sync-' + syncStatus" @click="syncStatus === 'offline' && retryConnect()">
+      <span class="sync-dot"></span>
+      <span class="sync-text" v-if="syncStatus === 'online'">已同步</span>
+      <span class="sync-text" v-else-if="syncStatus === 'connecting'">连接中</span>
+      <span class="sync-text" v-else>离线 · 点此重试</span>
+    </div>
+  </div>
+
+  <!-- ===================== 页面内容区 ===================== -->
+  <div class="page-content">
+
+    <!-- ============ 首页仪表盘 ============ -->
+    <div v-show="currentTab === 'dashboard'" class="page page-dashboard">
+
+      <!-- 项目信息卡片 -->
+      <div class="project-header-card">
+        <div class="project-info">
+          <div class="project-name">{{ project.name }}</div>
+          <div class="project-meta">
+            <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <span>{{ project.address }}</span>
+          </div>
+          <div class="project-meta">
+            <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+            <span>{{ project.startDate }} ~ {{ project.endDate }}</span>
+          </div>
+        </div>
+        <!-- 进度环 -->
+        <div class="progress-ring-wrap">
+          <svg class="progress-ring" width="80" height="80">
+            <circle cx="40" cy="40" r="34" stroke="#ffffff" stroke-width="6" fill="none" opacity="0.3"/>
+            <circle cx="40" cy="40" r="34" stroke="#ffffff" stroke-width="6" fill="none"
+              :stroke-dasharray="214" :stroke-dashoffset="214 - 214 * overallProgress / 100"
+              stroke-linecap="round" transform="rotate(-90 40 40)" class="progress-ring-circle"/>
+          </svg>
+          <div class="progress-ring-text">
+            <div class="progress-percent">{{ overallProgress }}%</div>
+            <div class="progress-label">总进度</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快捷统计 -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">{{ daysElapsed }}</div>
+          <div class="stat-label">已施工(天)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ daysRemaining }}</div>
+          <div class="stat-label">剩余(天)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ completedStages }}/{{ stages.length }}</div>
+          <div class="stat-label">已完成阶段</div>
+        </div>
+      </div>
+
+      <!-- 预算概览 -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">预算概览</span>
+          <span class="section-link" @click="currentTab = 'budget'">详情 ></span>
+        </div>
+        <div class="budget-overview">
+          <div class="budget-amounts">
+            <div class="budget-amount-item">
+              <span class="amount-label">总预算</span>
+              <span class="amount-value">{{ formatMoney(project.totalBudget) }}</span>
+            </div>
+            <div class="budget-amount-item">
+              <span class="amount-label">已花费</span>
+              <span class="amount-value spent">{{ formatMoney(totalSpent) }}</span>
+            </div>
+            <div class="budget-amount-item">
+              <span class="amount-label">剩余</span>
+              <span class="amount-value" :class="{ 'over-budget': remainingBudget < 0 }">{{ formatMoney(remainingBudget) }}</span>
+            </div>
+          </div>
+          <div class="budget-bar-wrap">
+            <div class="budget-bar">
+              <div class="budget-bar-fill" :style="{ width: Math.min(budgetProgress, 100) + '%' }"
+                :class="{ 'over': budgetProgress > 100 }"></div>
+            </div>
+            <span class="budget-bar-text">{{ budgetProgress.toFixed(1) }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 当前阶段 -->
+      <div class="section-card" v-if="currentStage">
+        <div class="section-header">
+          <span class="section-title">当前阶段</span>
+          <span class="section-link" @click="currentTab = 'process'">全部 ></span>
+        </div>
+        <div class="current-stage-card">
+          <div class="stage-status-badge" :class="'status-' + currentStage.status">{{ statusText(currentStage.status) }}</div>
+          <div class="current-stage-name">{{ currentStage.name }}</div>
+          <div class="current-stage-dates">{{ currentStage.startDate }} ~ {{ currentStage.endDate }}</div>
+          <div class="current-stage-contractor" v-if="currentStage.contractor">
+            <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            {{ currentStage.contractor }}
+          </div>
+          <div class="current-stage-actions" v-if="currentStage.status === 'in-progress' || currentStage.status === 'pending'">
+            <button class="btn-sm btn-primary" v-if="currentStage.status === 'pending'" @click="startStage(currentStage)">开始施工</button>
+            <button class="btn-sm btn-success" v-if="currentStage.status === 'in-progress'" @click="completeStage(currentStage)">标记完成</button>
+            <button class="btn-sm btn-default" @click="openStageModal(currentStage)">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最近现场照片 -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">最近现场</span>
+          <span class="section-link" @click="currentTab = 'photos'">全部 ></span>
+        </div>
+        <div class="recent-photos" v-if="recentPhotos.length > 0">
+          <div class="recent-photo-item" v-for="photo in recentPhotos" :key="photo.id" @click="openPhotoDetail(photo)">
+            <img :src="photo.url" :alt="photo.description" />
+            <div class="recent-photo-info">
+              <span class="photo-stage-tag">{{ photo.stage }}</span>
+              <span class="photo-date">{{ photo.uploadDate }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="empty-state" v-else>
+          <svg class="icon-lg" viewBox="0 0 24 24" fill="#ccc"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          <div class="empty-text">暂无现场照片</div>
+        </div>
+      </div>
+
+      <!-- 即将到来的任务 -->
+      <div class="section-card" v-if="upcomingTasks.length > 0">
+        <div class="section-header">
+          <span class="section-title">待办事项</span>
+          <span class="section-link" @click="currentTab = 'schedule'">全部 ></span>
+        </div>
+        <div class="upcoming-list">
+          <div class="upcoming-item" v-for="task in upcomingTasks" :key="task.id">
+            <div class="upcoming-dot" :class="'dot-' + task.status"></div>
+            <div class="upcoming-info">
+              <div class="upcoming-name">{{ task.name }}</div>
+              <div class="upcoming-date">{{ task.startDate }} ~ {{ task.endDate }}</div>
+            </div>
+            <div class="upcoming-stage-tag">{{ task.stage }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数据导出导入 -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">数据管理</span>
+        </div>
+        <div class="data-actions">
+          <button class="btn-data" @click="exportData">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            <span>导出数据</span>
+          </button>
+          <button class="btn-data" @click="$refs.importInput.click()">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5v-2z"/></svg>
+            <span>导入数据</span>
+          </button>
+          <input type="file" ref="importInput" accept=".json" style="display:none" @change="importData" />
+        </div>
+        <div class="sync-hint" v-if="syncStatus === 'online'">
+          云同步已开启，数据自动共享给其他用户
+        </div>
+        <div class="sync-hint" v-else>
+          云同步未连接，可导出数据通过微信发送给对方导入
+        </div>
+      </div>
+
+    </div>
+    <div v-show="currentTab === 'schedule'" class="page page-schedule">
+
+      <!-- 筛选标签 -->
+      <div class="filter-tabs">
+        <div class="filter-tab" :class="{ active: scheduleFilter === 'all' }" @click="scheduleFilter = 'all'">全部</div>
+        <div class="filter-tab" :class="{ active: scheduleFilter === 'pending' }" @click="scheduleFilter = 'pending'">待开始</div>
+        <div class="filter-tab" :class="{ active: scheduleFilter === 'in-progress' }" @click="scheduleFilter = 'in-progress'">进行中</div>
+        <div class="filter-tab" :class="{ active: scheduleFilter === 'completed' }" @click="scheduleFilter = 'completed'">已完成</div>
+      </div>
+
+      <!-- 任务列表 -->
+      <div class="task-list">
+        <div class="task-card" v-for="task in filteredTasks" :key="task.id">
+          <div class="task-timeline">
+            <div class="task-dot" :class="'dot-' + task.status"></div>
+            <div class="task-line" v-if="filteredTasks.indexOf(task) < filteredTasks.length - 1"></div>
+          </div>
+          <div class="task-body">
+            <div class="task-header">
+              <span class="task-name">{{ task.name }}</span>
+              <span class="task-status-badge" :class="'status-' + task.status">{{ statusText(task.status) }}</span>
+            </div>
+            <div class="task-stage-tag">{{ task.stage }}</div>
+            <div class="task-dates">
+              <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+              <span>{{ task.startDate }} ~ {{ task.endDate }}</span>
+            </div>
+            <div class="task-progress" v-if="task.status === 'in-progress'">
+              <div class="task-progress-bar">
+                <div class="task-progress-fill" :style="{ width: task.progress + '%' }"></div>
+              </div>
+              <span class="task-progress-text">{{ task.progress }}%</span>
+            </div>
+            <div class="task-actions">
+              <button class="btn-xs btn-primary" v-if="task.status === 'pending'" @click="startTask(task)">开始</button>
+              <button class="btn-xs btn-success" v-if="task.status === 'in-progress'" @click="completeTask(task)">完成</button>
+              <button class="btn-xs btn-default" @click="openTaskModal(task)">编辑</button>
+              <button class="btn-xs btn-danger-text" @click="deleteTask(task)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" v-if="filteredTasks.length === 0">
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="#ccc"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+        <div class="empty-text">暂无任务</div>
+      </div>
+
+      <!-- 添加按钮 -->
+      <div class="fab" @click="openTaskModal(null)">
+        <svg class="icon-md" viewBox="0 0 24 24" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </div>
+    </div>
+
+    <!-- ============ 预算管理 ============ -->
+    <div v-show="currentTab === 'budget'" class="page page-budget">
+
+      <!-- 预算总览卡片 -->
+      <div class="budget-summary-card">
+        <div class="budget-summary-row">
+          <div class="budget-summary-item">
+            <div class="budget-summary-label">总预算</div>
+            <div class="budget-summary-value">{{ formatMoney(project.totalBudget) }}</div>
+          </div>
+          <div class="budget-summary-item">
+            <div class="budget-summary-label">已花费</div>
+            <div class="budget-summary-value spent">{{ formatMoney(totalSpent) }}</div>
+          </div>
+          <div class="budget-summary-item">
+            <div class="budget-summary-label">剩余</div>
+            <div class="budget-summary-value" :class="{ 'over-budget': remainingBudget < 0 }">{{ formatMoney(remainingBudget) }}</div>
+          </div>
+        </div>
+        <div class="budget-total-bar">
+          <div class="budget-total-bar-fill" :style="{ width: Math.min(budgetProgress, 100) + '%' }"
+            :class="{ 'over': budgetProgress > 100 }"></div>
+        </div>
+        <div class="budget-summary-text">
+          预算使用率 {{ budgetProgress.toFixed(1) }}%
+          <span v-if="budgetProgress > 100" class="over-budget-tag">已超支 {{ formatMoney(totalSpent - project.totalBudget) }}</span>
+        </div>
+      </div>
+
+      <!-- 分类预算 -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">分类预算</span>
+        </div>
+        <div class="budget-category-list">
+          <div class="budget-category-item" v-for="cat in budgetCategories" :key="cat.name">
+            <div class="cat-header">
+              <span class="cat-name">{{ cat.name }}</span>
+              <span class="cat-amount">{{ formatMoney(cat.spent) }} / {{ formatMoney(cat.budget) }}</span>
+            </div>
+            <div class="cat-bar">
+              <div class="cat-bar-fill" :style="{ width: Math.min(cat.percentage, 100) + '%' }"
+                :class="{ 'over': cat.percentage > 100 }"></div>
+            </div>
+            <div class="cat-footer">
+              <span :class="{ 'over-budget': cat.percentage > 100 }">{{ cat.percentage.toFixed(0) }}%</span>
+              <span class="cat-items-count">{{ cat.items.length }} 项</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 支出明细 -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">支出明细</span>
+        </div>
+        <div class="expense-list">
+          <div class="expense-item" v-for="item in budget" :key="item.id"
+            :class="{ 'over-budget-item': item.actualAmount > item.budgetAmount && item.budgetAmount > 0 }">
+            <div class="expense-info">
+              <div class="expense-name">{{ item.item }}</div>
+              <div class="expense-category">{{ item.category }}</div>
+            </div>
+            <div class="expense-amounts">
+              <div class="expense-budget">{{ formatMoney(item.budgetAmount) }}</div>
+              <div class="expense-actual" :class="{ 'over-budget': item.actualAmount > item.budgetAmount && item.budgetAmount > 0 }">
+                {{ item.actualAmount > 0 ? formatMoney(item.actualAmount) : '--' }}
+              </div>
+            </div>
+            <div class="expense-actions">
+              <button class="btn-xs btn-default" @click="openExpenseModal(item)">编辑</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 添加按钮 -->
+      <div class="fab" @click="openExpenseModal(null)">
+        <svg class="icon-md" viewBox="0 0 24 24" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </div>
+    </div>
+
+    <!-- ============ 流程管理 ============ -->
+    <div v-show="currentTab === 'process'" class="page page-process">
+
+      <!-- 流程时间线 -->
+      <div class="process-timeline">
+        <div class="process-stage-card" v-for="(stage, idx) in stages" :key="stage.id">
+          <div class="process-timeline-left">
+            <div class="process-node" :class="'node-' + stage.status">
+              <svg v-if="stage.status === 'completed'" class="icon-sm white" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              <span v-else>{{ idx + 1 }}</span>
+            </div>
+            <div class="process-connector" v-if="idx < stages.length - 1" :class="{ 'completed': stage.status === 'completed' }"></div>
+          </div>
+          <div class="process-stage-content" @click="openStageModal(stage)">
+            <div class="process-stage-header">
+              <span class="process-stage-name">{{ stage.name }}</span>
+              <span class="process-stage-badge" :class="'status-' + stage.status">{{ statusText(stage.status) }}</span>
+            </div>
+            <div class="process-stage-dates">{{ stage.startDate }} ~ {{ stage.endDate }}</div>
+            <div class="process-stage-contractor" v-if="stage.contractor">
+              <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              <span>{{ stage.contractor }}</span>
+            </div>
+            <div class="process-stage-notes" v-if="stage.notes">{{ stage.notes }}</div>
+            <div class="process-stage-quick-actions" v-if="stage.status !== 'completed'">
+              <button class="btn-xs btn-primary" v-if="stage.status === 'pending'" @click.stop="startStage(stage)">开始</button>
+              <button class="btn-xs btn-success" v-if="stage.status === 'in-progress'" @click.stop="completeStage(stage)">完成</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 现场照片 ============ -->
+    <div v-show="currentTab === 'photos'" class="page page-photos">
+
+      <!-- 阶段筛选 -->
+      <div class="photo-filter-chips">
+        <div class="filter-chip" :class="{ active: photoFilter === 'all' }" @click="photoFilter = 'all'">全部</div>
+        <div class="filter-chip" v-for="stage in stages" :key="stage.id"
+          :class="{ active: photoFilter === stage.name }" @click="photoFilter = stage.name">{{ stage.name }}</div>
+      </div>
+
+      <!-- 照片网格 -->
+      <div class="photo-grid" v-if="filteredPhotos.length > 0">
+        <div class="photo-card" v-for="photo in filteredPhotos" :key="photo.id" @click="openPhotoDetail(photo)">
+          <img :src="photo.url" :alt="photo.description" loading="lazy" />
+          <div class="photo-overlay">
+            <span class="photo-overlay-stage">{{ photo.stage }}</span>
+            <span class="photo-overlay-date">{{ photo.uploadDate }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" v-else>
+        <svg class="icon-lg" viewBox="0 0 24 24" fill="#ccc"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        <div class="empty-text">暂无现场照片</div>
+        <div class="empty-hint">点击右下角按钮上传</div>
+      </div>
+
+      <!-- 上传按钮 -->
+      <div class="fab" @click="triggerPhotoUpload">
+        <svg class="icon-md" viewBox="0 0 24 24" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </div>
+      <input type="file" ref="photoInput" accept="image/*" style="display:none" @change="handlePhotoUpload" />
+    </div>
+
+  </div>
+
+  <!-- ===================== 底部导航栏 ===================== -->
+  <div class="tab-bar">
+    <div class="tab-item" v-for="tab in tabs" :key="tab.id"
+      :class="{ active: currentTab === tab.id }" @click="currentTab = tab.id">
+      <svg class="icon-tab" viewBox="0 0 24 24" fill="currentColor" v-html="tab.svg"></svg>
+      <span class="tab-label">{{ tab.label }}</span>
+    </div>
+  </div>
+
+  <!-- ===================== 弹窗区域 ===================== -->
+
+  <!-- 任务编辑弹窗 -->
+  <div class="modal-overlay" v-if="showTaskModal" @click.self="showTaskModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">{{ editingTask.id ? '编辑任务' : '新增任务' }}</span>
+        <span class="modal-close" @click="showTaskModal = false">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>任务名称</label>
+          <input type="text" v-model="editingTask.name" placeholder="如：客厅水电走线" />
+        </div>
+        <div class="form-group">
+          <label>所属阶段</label>
+          <select v-model="editingTask.stage">
+            <option v-for="stage in stages" :key="stage.id" :value="stage.name">{{ stage.name }}</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>开始日期</label>
+            <input type="date" v-model="editingTask.startDate" />
+          </div>
+          <div class="form-group">
+            <label>结束日期</label>
+            <input type="date" v-model="editingTask.endDate" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>状态</label>
+          <select v-model="editingTask.status">
+            <option value="pending">待开始</option>
+            <option value="in-progress">进行中</option>
+            <option value="completed">已完成</option>
+            <option value="delayed">已延期</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-cancel" @click="showTaskModal = false">取消</button>
+        <button class="btn-modal btn-confirm" @click="saveTask">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 预算编辑弹窗 -->
+  <div class="modal-overlay" v-if="showExpenseModal" @click.self="showExpenseModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">{{ editingExpense.id ? '编辑支出项' : '新增支出项' }}</span>
+        <span class="modal-close" @click="showExpenseModal = false">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>项目名称</label>
+          <input type="text" v-model="editingExpense.item" placeholder="如：瓷砖" />
+        </div>
+        <div class="form-group">
+          <label>分类</label>
+          <select v-model="editingExpense.category">
+            <option v-for="cat in categoryNames" :key="cat" :value="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>预算金额</label>
+            <input type="number" v-model.number="editingExpense.budgetAmount" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>实际花费</label>
+            <input type="number" v-model.number="editingExpense.actualAmount" placeholder="0" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-cancel" @click="showExpenseModal = false">取消</button>
+        <button class="btn-modal btn-confirm" @click="saveExpense">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 阶段编辑弹窗 -->
+  <div class="modal-overlay" v-if="showStageModal" @click.self="showStageModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">编辑阶段 - {{ editingStage.name }}</span>
+        <span class="modal-close" @click="showStageModal = false">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>状态</label>
+          <select v-model="editingStage.status">
+            <option value="pending">待开始</option>
+            <option value="in-progress">进行中</option>
+            <option value="completed">已完成</option>
+            <option value="delayed">已延期</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>开始日期</label>
+            <input type="date" v-model="editingStage.startDate" />
+          </div>
+          <div class="form-group">
+            <label>结束日期</label>
+            <input type="date" v-model="editingStage.endDate" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>施工方/负责人</label>
+          <input type="text" v-model="editingStage.contractor" placeholder="如：张师傅 138xxxx" />
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea v-model="editingStage.notes" rows="3" placeholder="施工注意事项、验收标准等"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-cancel" @click="showStageModal = false">取消</button>
+        <button class="btn-modal btn-confirm" @click="saveStage">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 照片详情弹窗 -->
+  <div class="modal-overlay" v-if="showPhotoDetail" @click.self="showPhotoDetail = false">
+    <div class="modal-content photo-detail-modal">
+      <div class="modal-header">
+        <span class="modal-title">现场照片</span>
+        <span class="modal-close" @click="showPhotoDetail = false">&times;</span>
+      </div>
+      <div class="modal-body photo-detail-body">
+        <img :src="viewingPhoto.url" class="photo-detail-img" />
+        <div class="photo-detail-info">
+          <div class="photo-detail-row">
+            <span class="photo-detail-label">阶段</span>
+            <span class="photo-detail-value">{{ viewingPhoto.stage }}</span>
+          </div>
+          <div class="photo-detail-row">
+            <span class="photo-detail-label">上传人</span>
+            <span class="photo-detail-value">{{ viewingPhoto.uploadBy }}</span>
+          </div>
+          <div class="photo-detail-row">
+            <span class="photo-detail-label">日期</span>
+            <span class="photo-detail-value">{{ viewingPhoto.uploadDate }}</span>
+          </div>
+          <div class="photo-detail-row">
+            <span class="photo-detail-label">说明</span>
+          </div>
+          <textarea v-model="viewingPhoto.description" rows="3" placeholder="添加文字说明..."
+            @blur="savePhotoDescription"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-danger-text" @click="deletePhoto(viewingPhoto)">删除照片</button>
+        <button class="btn-modal btn-confirm" @click="showPhotoDetail = false">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 照片上传弹窗 -->
+  <div class="modal-overlay" v-if="showPhotoUpload" @click.self="showPhotoUpload = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">上传现场照片</span>
+        <span class="modal-close" @click="showPhotoUpload = false">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="photo-preview" v-if="newPhoto.url">
+          <img :src="newPhoto.url" />
+        </div>
+        <div class="form-group">
+          <label>所属阶段</label>
+          <select v-model="newPhoto.stage">
+            <option v-for="stage in stages" :key="stage.id" :value="stage.name">{{ stage.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>上传人</label>
+          <input type="text" v-model="newPhoto.uploadBy" placeholder="如：装修公司/张师傅" />
+        </div>
+        <div class="form-group">
+          <label>文字说明</label>
+          <textarea v-model="newPhoto.description" rows="3" placeholder="描述现场情况，如：客厅水电走线完成，等待验收"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal btn-cancel" @click="showPhotoUpload = false">取消</button>
+        <button class="btn-modal btn-confirm" @click="savePhoto">上传</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="toast" v-if="toastMessage">{{ toastMessage }}</div>
+
+</div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
