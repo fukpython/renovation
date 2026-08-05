@@ -1623,6 +1623,207 @@ html, body {
   color: var(--primary);
 }
 
+/* ===================== 桌面端 / 平板适配 ===================== */
+@media (min-width: 768px) {
+  body {
+    background: linear-gradient(135deg, #e8f8f0 0%, #f5f6f8 60%, #f0f7ff 100%);
+    min-height: 100vh;
+  }
+
+  /* 整体容器改成 grid 布局 */
+  #app {
+    max-width: 1100px;
+    margin: 24px auto;
+    min-height: calc(100vh - 48px);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "nav nav"
+      "sidebar content";
+  }
+
+  /* 隐藏手机状态栏 */
+  .status-bar {
+    display: none;
+  }
+
+  /* 顶部导航 */
+  .nav-bar {
+    grid-area: nav;
+    height: 64px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  .nav-title {
+    font-size: 18px;
+  }
+  .sync-indicator {
+    font-size: 12px;
+  }
+
+  /* 左侧侧边栏 (原来的底部 tab bar) */
+  .tab-bar {
+    grid-area: sidebar;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    background: var(--bg-card);
+    box-shadow: none;
+    padding: 20px 12px;
+    gap: 4px;
+    position: static;
+  }
+  .tab-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .tab-item.active {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+  }
+  .tab-item:hover {
+    background: #f5f6f8;
+  }
+  .tab-item.active:hover {
+    background: var(--primary-light);
+  }
+  .icon-tab {
+    width: 20px;
+    height: 20px;
+  }
+  .tab-label {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* 内容区 */
+  .page-content {
+    grid-area: content;
+    overflow-y: auto;
+    padding: 0;
+  }
+  .page {
+    padding: 24px 28px;
+  }
+
+  /* === 首页 - 多列布局 === */
+  .page-dashboard {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 16px;
+    align-items: start;
+  }
+  /* 顶部全宽：项目头 + 统计 */
+  .page-dashboard > .project-header-card,
+  .page-dashboard > .stats-grid {
+    grid-column: 1 / -1;
+  }
+  .project-header-card {
+    padding: 28px 32px;
+    border-radius: 16px;
+  }
+  .project-name {
+    font-size: 24px;
+  }
+  .project-meta {
+    font-size: 13px;
+  }
+  .progress-ring-wrap {
+    width: 100px;
+    height: 100px;
+  }
+  .progress-ring {
+    width: 100px;
+    height: 100px;
+  }
+  .progress-percent {
+    font-size: 22px;
+  }
+  .progress-label {
+    font-size: 11px;
+  }
+
+  .stats-grid {
+    gap: 16px;
+    margin-bottom: 0;
+  }
+  .stat-card {
+    padding: 20px 16px;
+    border-radius: 14px;
+  }
+  .stat-icon {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-size: 26px;
+  }
+  .stat-label {
+    font-size: 13px;
+  }
+
+  /* 其余 section-card 自动两列流式布局 */
+  .page-dashboard > .section-card {
+    margin-bottom: 0;
+  }
+
+  /* === 隐藏浮动按钮 === */
+  .fab {
+    display: none;
+  }
+
+  /* === 工期 / 预算 / 流程 / 照片页：内容居中 === */
+  .page-schedule, .page-budget, .page-process, .page-photos {
+    max-width: 960px;
+  }
+
+  /* 流程页 - 时间线变两列 */
+  .page-process .process-timeline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* 照片页 - 网格更大 */
+  .photos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+  }
+
+  /* 弹窗居中 */
+  .modal-overlay {
+    align-items: center;
+  }
+  .modal-content {
+    max-width: 520px;
+    margin: auto;
+    border-radius: 16px;
+    max-height: 85vh;
+  }
+}
+
+/* 大屏（> 1200px） */
+@media (min-width: 1200px) {
+  #app {
+    max-width: 1200px;
+  }
+  .page-dashboard {
+    grid-template-columns: 1fr 400px;
+  }
+}
+
 .sync-hint {
   font-size: 11px;
   color: var(--text-secondary);
