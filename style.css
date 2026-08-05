@@ -1712,6 +1712,118 @@ html, body {
   color: var(--primary);
 }
 
+/* ===================== 工期任务拖拽样式 ===================== */
+.task-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  touch-action: pan-y;
+  position: relative;
+}
+
+.task-card.is-dragging {
+  opacity: 0.85;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  background: #f8faf8;
+}
+
+.task-card.is-drag-target {
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 4px 16px rgba(7,193,96,0.15);
+}
+
+.task-card .task-drag-handle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-placeholder);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 6px;
+}
+
+.task-card .task-drag-handle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.task-card:hover .task-drag-handle {
+  opacity: 0.4;
+}
+
+.task-card .task-drag-handle:hover {
+  opacity: 1 !important;
+  background: #f0f0f0;
+  color: var(--text-secondary);
+}
+
+.task-card .task-drag-handle:active {
+  cursor: grabbing;
+}
+
+@media (min-width: 768px) {
+  .task-card .task-drag-handle {
+    opacity: 0.35;
+  }
+}
+
+/* ===================== 预算编辑按钮 ===================== */
+.edit-budget-btn {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  margin-left: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.edit-budget-btn:hover {
+  opacity: 1;
+}
+
+.budget-allocated-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.allocated-label {
+  color: var(--text-secondary);
+}
+
+.allocated-value {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  text-align: center;
+}
+
+.allocated-pct {
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: right;
+}
+
+.budget-edit-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 10px;
+  background: #f5f6f8;
+  border-radius: 8px;
+  line-height: 1.6;
+}
+
 /* ===================== 桌面端 / 平板适配 ===================== */
 @media (min-width: 768px) {
   body {
