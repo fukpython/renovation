@@ -344,9 +344,29 @@
     <!-- ============ 流程管理 ============ -->
     <div v-show="currentTab === 'process'" class="page page-process">
 
+      <!-- 拖拽提示 -->
+      <div class="drag-hint" v-if="stages.length > 1">
+        <svg class="icon-xs" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        <span>长按阶段卡片可拖动调整顺序</span>
+      </div>
+
       <!-- 流程时间线 -->
       <div class="process-timeline">
-        <div class="process-stage-card" v-for="(stage, idx) in stages" :key="stage.id">
+        <div class="process-stage-card" v-for="(stage, idx) in stages" :key="stage.id"
+          :data-drag-id="stage.id"
+          :class="{
+            'is-dragging': dragState.isDragging && dragState.stageId === stage.id,
+            'is-drag-target': dragState.isDragging && dragState.targetIdx === idx && dragState.stageId !== stage.id
+          }"
+          :style="dragState.isDragging && dragState.stageId === stage.id
+            ? { transform: 'translateY(' + dragState.offsetY + 'px) scale(1.03)', zIndex: 100 }
+            : (dragState.isDragging && dragState.targetIdx === idx && dragState.stageId !== stage.id
+              ? { transform: 'translateY(' + (dragState.startIdx > idx ? 8 : -8) + 'px)' }
+              : null)"
+          @touchstart.passive="onDragStart($event, stage, idx)"
+          @touchmove="onDragMove"
+          @touchend="onDragEnd"
+          @touchcancel="onDragEnd">
           <div class="process-timeline-left">
             <div class="process-node" :class="'node-' + stage.status">
               <svg v-if="stage.status === 'completed'" class="icon-sm white" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
@@ -354,7 +374,7 @@
             </div>
             <div class="process-connector" v-if="idx < stages.length - 1" :class="{ 'completed': stage.status === 'completed' }"></div>
           </div>
-          <div class="process-stage-content" @click="openStageModal(stage)">
+          <div class="process-stage-content" @click="onStageClick(stage)">
             <div class="process-stage-header">
               <span class="process-stage-name">{{ stage.name }}</span>
               <span class="process-stage-badge" :class="'status-' + stage.status">{{ statusText(stage.status) }}</span>
@@ -368,6 +388,12 @@
             <div class="process-stage-quick-actions" v-if="stage.status !== 'completed'">
               <button class="btn-xs btn-primary" v-if="stage.status === 'pending'" @click.stop="startStage(stage)">开始</button>
               <button class="btn-xs btn-success" v-if="stage.status === 'in-progress'" @click.stop="completeStage(stage)">完成</button>
+            </div>
+            <!-- 桌面端拖拽手柄 -->
+            <div class="drag-handle"
+              @mousedown.stop="onMouseDragStart($event, stage, idx)"
+              @touchstart.stop>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
             </div>
           </div>
         </div>
