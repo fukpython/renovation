@@ -1148,6 +1148,95 @@ html, body {
   margin-top: 10px;
 }
 
+/* 拖拽排序样式 */
+.process-stage-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  touch-action: pan-y;
+}
+
+.process-stage-card.is-dragging {
+  opacity: 0.85;
+  z-index: 100;
+}
+
+.process-stage-card.is-dragging .process-stage-content {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  background: #f8faf8;
+}
+
+.process-stage-card.is-drag-target .process-stage-content {
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 4px 16px rgba(7,193,96,0.15);
+}
+
+/* 拖拽手柄（桌面端） */
+.drag-handle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-placeholder);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 6px;
+}
+
+.drag-handle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.process-stage-content {
+  position: relative;
+}
+
+.process-stage-content:hover .drag-handle {
+  opacity: 0.4;
+}
+
+.drag-handle:hover {
+  opacity: 1 !important;
+  background: #f0f0f0;
+  color: var(--text-secondary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+@media (min-width: 768px) {
+  .drag-handle {
+    opacity: 0.35;
+  }
+}
+
+/* 拖拽提示文字 */
+.drag-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: #f5f6f8;
+  border-radius: 10px;
+}
+
+.drag-hint .icon-xs {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+}
+
 /* ===================== 现场照片 ===================== */
 .photo-filter-chips {
   display: flex;
@@ -1789,11 +1878,9 @@ html, body {
     max-width: 960px;
   }
 
-  /* 流程页 - 时间线变两列 */
+  /* 流程页 - 单列（支持拖拽排序） */
   .page-process .process-timeline {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    max-width: 700px;
   }
 
   /* 照片页 - 网格更大 */
