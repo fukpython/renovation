@@ -1673,6 +1673,12 @@ const __vueApp = createApp({
 
     // ---- 启动 ----
     onMounted(() => {
+      // 隐藏加载界面（多重保障）
+      var __ls = document.getElementById('__loadingScreen');
+      if (__ls) {
+        __ls.style.opacity = '0';
+        setTimeout(function() { __ls.style.display = 'none'; }, 300);
+      }
       checkDelayed();
       initMQTT();
       // 每分钟检查一次延期
