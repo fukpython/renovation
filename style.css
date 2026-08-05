@@ -1317,6 +1317,37 @@ html, body {
   color: white;
 }
 
+.btn-danger {
+  background: var(--danger);
+  color: white;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+}
+
+/* 添加阶段按钮 */
+.btn-add-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  background: transparent;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add-stage:active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(7, 193, 96, 0.05);
+}
+
 .btn-danger-text {
   background: transparent;
   color: var(--danger);
