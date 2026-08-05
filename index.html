@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<!-- 加载界面放在 #app 外面，避免被 v-cloak 隐藏 -->
-<div id="__loadingScreen" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;font-family:sans-serif;color:#999;">
+<!-- 加载界面：position:fixed 覆盖在 app 上面，不占文档流空间 -->
+<div id="__loadingScreen" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;font-family:sans-serif;color:#999;background:#fff;">
   <div style="width:32px;height:32px;border:3px solid #07c160;border-top-color:transparent;border-radius:50%;animation:__spin 0.8s linear infinite;"></div>
   <div>装修管家加载中...</div>
 </div>
@@ -1064,25 +1064,45 @@ function tryStartApp() {
   __appStarted = true;
   console.log('[启动] Vue就绪，加载app.js');
   // 加缓存破坏参数，避免浏览器加载旧缓存
-  loadScript('app.js?v=20260805c', function() {
+  loadScript('app.js?v=20260805d', function() {
     console.log('[启动] app.js加载完成');
   }, function() {
     window.__showError('app.js加载失败，请刷新页面重试。');
   }, 10000);
 }
 
-// 超时检测：15秒后如果加载界面还在，提示用户
-setTimeout(function() {
+// 智能检测：每秒检查一次，如果 app 已渲染就隐藏加载界面
+var __checkCount = 0;
+var __checkTimer = setInterval(function() {
+  __checkCount++;
   var ls = document.getElementById('__loadingScreen');
-  if (ls && ls.style.display !== 'none') {
-    var msg = '应用加载超时。请尝试：\n';
-    msg += '1. 清除浏览器缓存后刷新\n';
-    msg += '2. 用无痕模式打开\n';
-    msg += '3. 清除站点数据（设置→隐私→清除浏览数据）\n';
-    msg += '4. 切换网络（WiFi/流量）';
-    window.__showError(msg);
+  if (!ls || ls.style.display === 'none') {
+    clearInterval(__checkTimer);
+    return;
   }
-}, 15000);
+  // 检查 #app 是否已被 Vue 渲染（有子元素且 v-cloak 已移除）
+  var app = document.getElementById('app');
+  if (app && app.children.length > 0 && !app.hasAttribute('v-cloak')) {
+    // Vue 已渲染，隐藏加载界面
+    console.log('[启动] 检测到app已渲染，隐藏加载界面');
+    ls.style.opacity = '0';
+    setTimeout(function() { ls.style.display = 'none'; }, 300);
+    clearInterval(__checkTimer);
+    return;
+  }
+  // 15秒后仍未加载
+  if (__checkCount >= 15) {
+    clearInterval(__checkTimer);
+    if (ls && ls.style.display !== 'none') {
+      var msg = '应用加载超时。请尝试：\n';
+      msg += '1. 清除浏览器缓存后刷新\n';
+      msg += '2. 用无痕模式打开\n';
+      msg += '3. 清除站点数据（设置→隐私→清除浏览数据）\n';
+      msg += '4. 切换网络（WiFi/流量）';
+      window.__showError(msg);
+    }
+  }
+}, 1000);
 
 // 优先加载Vue（关键路径），MQTT后台加载（非关键路径）
 tryLoadVue(0);
