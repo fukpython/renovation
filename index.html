@@ -957,6 +957,15 @@
 
 </div>
 
+<script>
+// 全局错误处理，防止白屏
+window.addEventListener('error', function(e) {
+  console.error('[全局错误]', e.error || e.message);
+});
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('[未处理Promise]', e.reason);
+});
+</script>
 <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 <script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
 <script src="app.js"></script>
