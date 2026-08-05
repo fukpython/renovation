@@ -1824,6 +1824,509 @@ html, body {
   line-height: 1.6;
 }
 
+/* ===================== 页面顶部操作栏 (任务12) ===================== */
+.page-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.page-top-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.page-top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-page-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-page-add:active {
+  opacity: 0.8;
+  transform: scale(0.96);
+}
+
+.btn-page-sm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #f0f0f0;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-page-sm:active {
+  background: #e8e8e8;
+}
+
+/* 搜索框 (任务19) */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  flex: 1;
+  max-width: 240px;
+  transition: border-color 0.2s;
+}
+
+.search-box:focus-within {
+  border-color: var(--primary);
+}
+
+.search-box .search-icon {
+  color: var(--text-placeholder);
+  flex-shrink: 0;
+}
+
+.search-box input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  flex: 1;
+  font-family: inherit;
+  color: var(--text-primary);
+}
+
+.search-clear {
+  font-size: 18px;
+  color: var(--text-placeholder);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+/* ===================== 今日要点 (任务21) ===================== */
+.today-alerts {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  border-left: 3px solid var(--warning);
+}
+
+.today-alerts-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.today-alerts-header svg {
+  color: var(--warning);
+}
+
+.today-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.today-alert-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f9f9f9;
+}
+
+.alert-warning {
+  background: var(--warning-light);
+}
+
+.alert-danger {
+  background: var(--danger-light);
+}
+
+.alert-info {
+  background: #eef7ff;
+}
+
+.alert-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.alert-warning .alert-title { color: var(--warning); }
+.alert-danger .alert-title { color: var(--danger); }
+.alert-info .alert-title { color: var(--info); }
+
+.alert-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.alert-item-tag {
+  font-size: 11px;
+  background: rgba(255,255,255,0.6);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+/* 延期统计 */
+.stat-delayed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--danger);
+  background: var(--danger-light);
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+/* 当前阶段预算 */
+.current-stage-budget {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.current-stage-budget svg {
+  color: var(--primary);
+}
+
+/* ===================== 阶段关联预算 (任务23) ===================== */
+.process-stage-budget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.process-stage-budget svg {
+  color: var(--primary);
+}
+
+.stage-budget-bar {
+  display: block;
+  width: 60px;
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.stage-budget-fill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.stage-budget-fill.over {
+  background: var(--danger);
+}
+
+/* ===================== 阶段验收 (任务24) ===================== */
+.process-stage-acceptance {
+  margin-top: 8px;
+  padding: 10px;
+  background: #f8faf8;
+  border-radius: 10px;
+  border: 1px solid #e8f0e8;
+}
+
+.acceptance-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.acceptance-header svg {
+  color: var(--primary);
+}
+
+.acceptance-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-placeholder);
+}
+
+.acceptance-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.acceptance-check-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: white;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.acceptance-check-item.checked {
+  color: var(--primary-dark);
+  background: var(--primary-light);
+}
+
+.check-box {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #d0d0d0;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.acceptance-check-item.checked .check-box {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.check-box svg {
+  color: white;
+  width: 12px;
+  height: 12px;
+}
+
+/* ===================== 照片按日期分组 (任务18) ===================== */
+.photo-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.photo-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.photo-date-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 6px 0;
+}
+
+.photo-date-header svg {
+  color: var(--primary);
+}
+
+.photo-date-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* 照片视图切换 */
+.photo-view-toggle {
+  display: flex;
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.view-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-toggle-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* 批量上传指示器 */
+.batch-indicator {
+  font-size: 12px;
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+/* ===================== 操作记录 (任务20) ===================== */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-action-btn {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.nav-action-btn:active {
+  opacity: 0.6;
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.log-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-action-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  background: #f0f0f0;
+  color: var(--text-secondary);
+}
+
+.log-add { background: var(--primary-light); color: var(--primary); }
+.log-delete { background: var(--danger-light); color: var(--danger); }
+.log-edit { background: #eef7ff; color: var(--info); }
+.log-complete { background: var(--primary-light); color: var(--primary-dark); }
+.log-start { background: #fff5ef; color: var(--warning); }
+.log-reorder { background: #f5f0ff; color: #7c5cdb; }
+.log-acceptance { background: var(--primary-light); color: var(--primary-dark); }
+.log-budget { background: #fff5ef; color: var(--warning); }
+.log-sync { background: #f0f0f0; color: var(--text-secondary); }
+
+.log-detail {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-placeholder);
+}
+
+/* ===================== 分类管理 (任务22) ===================== */
+.category-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.category-input-row input,
+.category-input-row select {
+  flex: 1;
+}
+
+.category-input-row button {
+  flex-shrink: 0;
+}
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.category-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-list-item:last-child {
+  border-bottom: none;
+}
+
+.category-list-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.category-list-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 /* ===================== 桌面端 / 平板适配 ===================== */
 @media (min-width: 768px) {
   body {
