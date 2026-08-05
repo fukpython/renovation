@@ -1743,3 +1743,10 @@ __vueApp.config.errorHandler = function(err, instance, info) {
 };
 __vueApp.mount("#app");
 
+// 隐藏加载界面（现在在 #app 外面，Vue mount 不会自动移除）
+var __ls = document.getElementById('__loadingScreen');
+if (__ls) {
+  __ls.style.opacity = '0';
+  setTimeout(function() { __ls.style.display = 'none'; }, 300);
+}
+
