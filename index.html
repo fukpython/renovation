@@ -984,16 +984,106 @@ window.addEventListener('unhandledrejection', function(e) {
   console.error('[未处理Promise]', e.reason);
   window.__showError('异步错误: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
 });
-// 超时检测：10秒后如果加载界面还在，说明 Vue 加载失败
+
+// ====== 多CDN加载Vue + MQTT ======
+// 国内优先，国外回退
+var VUE_CDNS = [
+  "https://cdn.bootcdn.net/ajax/libs/vue/3.4.21/vue.global.prod.min.js",
+  "https://cdn.staticfile.org/vue/3.4.21/vue.global.prod.min.js",
+  "https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"
+];
+var MQTT_CDNS = [
+  "https://cdn.bootcdn.net/ajax/libs/mqtt/4.3.7/mqtt.min.js",
+  "https://cdn.staticfile.org/mqtt/4.3.7/mqtt.min.js"
+];
+var __vueReady = false;
+var __mqttReady = false;
+var __appStarted = false;
+
+function loadScript(url, onSuccess, onError, timeout) {
+  var script = document.createElement('script');
+  script.src = url;
+  script.crossOrigin = 'anonymous';
+  var done = false;
+  var timer = setTimeout(function() {
+    if (!done) { done = true; script.onload = script.onerror = null; onError(); }
+  }, timeout || 8000);
+  script.onload = function() {
+    if (done) return;
+    done = true; clearTimeout(timer);
+    onSuccess();
+  };
+  script.onerror = function() {
+    if (done) return;
+    done = true; clearTimeout(timer);
+    onError();
+  };
+  document.head.appendChild(script);
+}
+
+function tryLoadVue(idx) {
+  if (idx >= VUE_CDNS.length) {
+    window.__showError('Vue加载失败，所有CDN均不可用。请检查网络后刷新页面。');
+    return;
+  }
+  console.log('[CDN] 尝试加载Vue:', VUE_CDNS[idx]);
+  loadScript(VUE_CDNS[idx], function() {
+    if (typeof Vue !== 'undefined') {
+      console.log('[CDN] Vue加载成功:', VUE_CDNS[idx]);
+      __vueReady = true;
+      tryStartApp();
+    } else {
+      console.warn('[CDN] Vue加载但全局对象不存在，尝试下一个');
+      tryLoadVue(idx + 1);
+    }
+  }, function() {
+    console.warn('[CDN] Vue加载失败，尝试下一个:', VUE_CDNS[idx]);
+    tryLoadVue(idx + 1);
+  }, 8000);
+}
+
+function tryLoadMqtt(idx) {
+  if (idx >= MQTT_CDNS.length) {
+    console.warn('[CDN] MQTT所有CDN均不可用，云同步功能将不可用');
+    __mqttReady = true; // 允许继续，只是没有云同步
+    tryStartApp();
+    return;
+  }
+  console.log('[CDN] 尝试加载MQTT:', MQTT_CDNS[idx]);
+  loadScript(MQTT_CDNS[idx], function() {
+    console.log('[CDN] MQTT加载成功:', MQTT_CDNS[idx]);
+    __mqttReady = true;
+    tryStartApp();
+  }, function() {
+    console.warn('[CDN] MQTT加载失败，尝试下一个:', MQTT_CDNS[idx]);
+    tryLoadMqtt(idx + 1);
+  }, 8000);
+}
+
+function tryStartApp() {
+  if (__appStarted) return;
+  if (!__vueReady) return; // Vue必须加载
+  if (!__mqttReady) return; // 等MQTT也完成（成功或失败都算完成）
+  __appStarted = true;
+  console.log('[启动] Vue+MQTT就绪，加载app.js');
+  loadScript('app.js', function() {
+    console.log('[启动] app.js加载完成');
+  }, function() {
+    window.__showError('app.js加载失败，请刷新页面重试。');
+  }, 10000);
+}
+
+// 超时检测：20秒后如果加载界面还在，说明整体加载失败
 setTimeout(function() {
   var ls = document.getElementById('__loadingScreen');
   if (ls && ls.style.display !== 'none') {
-    window.__showError('应用加载超时，请检查网络或刷新页面。如果使用 CDN 被墙，请尝试科学上网或刷新。');
+    window.__showError('应用加载超时。可能原因：1)网络较慢，请耐心等待或刷新 2)CDN被墙，请尝试切换网络 3)浏览器存储数据过大，可清除站点数据后重试。');
   }
-}, 10000);
+}, 20000);
+
+// 并行加载Vue和MQTT
+tryLoadVue(0);
+tryLoadMqtt(0);
 </script>
-<script src="https://cdn.bootcdn.net/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
-<script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
-<script src="app.js"></script>
 </body>
 </html>
