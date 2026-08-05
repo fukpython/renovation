@@ -891,7 +891,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-modal btn-danger-text" @click="deletePhoto(viewingPhoto)">删除照片</button>
+        <button class="btn-modal btn-danger-text" :class="{ 'btn-danger-active': photoDeleteConfirm }" @click="deletePhoto(viewingPhoto)">{{ photoDeleteConfirm ? '确认删除？' : '删除照片' }}</button>
         <button class="btn-modal btn-confirm" @click="showPhotoDetail = false">关闭</button>
       </div>
     </div>
@@ -1064,7 +1064,7 @@ function tryStartApp() {
   __appStarted = true;
   console.log('[启动] Vue就绪，加载app.js');
   // 加缓存破坏参数，避免浏览器加载旧缓存
-  loadScript('app.js?v=20260805e', function() {
+  loadScript('app.js?v=20260805f', function() {
     console.log('[启动] app.js加载完成');
   }, function() {
     window.__showError('app.js加载失败，请刷新页面重试。');
