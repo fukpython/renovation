@@ -194,6 +194,15 @@ createApp({
     updateTime();
     setInterval(updateTime, 30000);
 
+    // ---- 进度环响应式尺寸 ----
+    const isDesktop = ref(window.innerWidth >= 768);
+    window.addEventListener("resize", () => {
+      isDesktop.value = window.innerWidth >= 768;
+    });
+    const progressRingSize = computed(() => isDesktop.value ? 100 : 80);
+    const progressRingRadius = computed(() => isDesktop.value ? 50 : 40);
+    const ringCircumference = computed(() => 2 * Math.PI * (progressRingRadius.value - 6));
+
     // ---- Toast ----
     const toastMessage = ref("");
     let toastTimer = null;
@@ -954,6 +963,7 @@ createApp({
       // 数据
       project, stages, tasks, budget, photos,
       currentTab, tabs, navTitle, currentTime,
+      progressRingSize, progressRingRadius, ringCircumference,
       // 筛选
       scheduleFilter, filteredTasks, photoFilter, filteredPhotos,
       // 弹窗状态
