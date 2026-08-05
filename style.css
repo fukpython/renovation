@@ -557,6 +557,10 @@ html, body {
   background: transparent;
   color: var(--danger);
 }
+.btn-danger-active {
+  background: var(--danger);
+  color: #fff;
+}
 
 /* ===================== 最近照片 ===================== */
 .recent-photos {
