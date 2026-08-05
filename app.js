@@ -148,30 +148,25 @@ function loadData() {
 function saveData(data) {
   try {
     data._version = DATA_VERSION;
+    var jsonStr = JSON.stringify(data);
+    console.log("[存储] 数据大小:", (jsonStr.length / 1024).toFixed(1), "KB, 照片:", (data.photos || []).length, "张");
 
-    // 照片存储优化：如果数据太大，压缩旧照片
-    let jsonStr = JSON.stringify(data);
-    console.log("[存储] 数据大小:", (jsonStr.length / 1024).toFixed(1), "KB, 照片:", data.photos.length, "张");
     if (jsonStr.length > 4 * 1024 * 1024) {
-      // 超过4MB，删除最旧的照片直到降到3MB以下
-      while (jsonStr.length > 3 * 1024 * 1024 && data.photos.length > 10) {
-        data.photos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-        data.photos = data.photos.slice(0, Math.floor(data.photos.length * 0.8));
-        jsonStr = JSON.stringify(data);
-      }
-      console.log("[存储优化] 照片已压缩至", data.photos.length, "张");
+      // 超过4MB，不含照片保存
+      data.photos = [];
+      jsonStr = JSON.stringify(data);
+      console.warn("[存储] 数据过大，不含照片保存");
     }
 
     localStorage.setItem(STORAGE_KEY, jsonStr);
   } catch (e) {
     console.error("保存数据失败:", e);
     if (e.name === "QuotaExceededError") {
-      // 紧急删除一半照片
       try {
-        data.photos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-        data.photos = data.photos.slice(0, Math.ceil(data.photos.length / 2));
+        data.photos = [];
+        data.logs = [];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        console.log("[存储] 紧急清理照片，剩余", data.photos.length, "张");
+        console.warn("[存储] 紧急保存（不含照片和日志）");
       } catch (e2) {
         console.error("存储彻底失败:", e2);
       }
@@ -204,18 +199,18 @@ function compressImage(file, callback) {
   console.log("[照片] 开始压缩:", file.name, file.type, file.size, "bytes");
 
   if (!file.type.startsWith("image/")) {
-    console.log("[照片] 非图片文件，跳过压缩");
+    console.log("[照片] 非图片文件，跳过");
     callback(null);
     return;
   }
 
-  const reader = new FileReader();
+  var reader = new FileReader();
   reader.onerror = function() {
     console.error("[照片] FileReader 读取失败");
     callback(null);
   };
   reader.onload = function(event) {
-    const img = new Image();
+    var img = new Image();
     img.onerror = function() {
       console.error("[照片] Image 加载失败");
       callback(null);
@@ -223,37 +218,59 @@ function compressImage(file, callback) {
     img.onload = function() {
       try {
         // 根据原始文件大小动态调整压缩参数
-        let maxW = 480, maxH = 360, quality = 0.4;
+        var maxW = 480, maxH = 360, quality = 0.4;
         if (file.size > 3 * 1024 * 1024) {
           maxW = 320; maxH = 240; quality = 0.3;
         } else if (file.size > 1 * 1024 * 1024) {
           maxW = 400; maxH = 300; quality = 0.35;
         }
 
-        const canvas = document.createElement("canvas");
-        let w = img.width, h = img.height;
+        var canvas = document.createElement("canvas");
+        var w = img.width, h = img.height;
         if (w > maxW) { h = h * maxW / w; w = maxW; }
         if (h > maxH) { w = w * maxH / h; h = maxH; }
         canvas.width = Math.max(1, Math.round(w));
         canvas.height = Math.max(1, Math.round(h));
-        const ctx = canvas.getContext("2d");
+        var ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        let result = canvas.toDataURL("image/jpeg", quality);
+        var result = canvas.toDataURL("image/jpeg", quality);
 
-        // 如果 base64 仍然超过 60KB，进一步压缩
+        // 某些手机浏览器忽略 quality 参数返回 PNG，检查并处理
+        if (result.indexOf("data:image/png") === 0) {
+          console.warn("[照片] 浏览器返回PNG，尝试强制JPEG");
+          result = canvas.toDataURL("image/jpeg", 0.25);
+        }
+
+        // 如果 base64 仍然超过 60KB，进一步压缩质量
         if (result.length > 60000) {
           result = canvas.toDataURL("image/jpeg", 0.2);
         }
         // 如果还是超过 50KB，缩小尺寸
         if (result.length > 50000) {
-          const c2 = document.createElement("canvas");
+          var c2 = document.createElement("canvas");
           c2.width = Math.round(canvas.width * 0.7);
           c2.height = Math.round(canvas.height * 0.7);
           c2.getContext("2d").drawImage(canvas, 0, 0, c2.width, c2.height);
           result = c2.toDataURL("image/jpeg", 0.2);
         }
+        // 硬性限制：如果仍超过 80KB，继续缩小
+        if (result.length > 80000) {
+          var c3 = document.createElement("canvas");
+          c3.width = Math.round(canvas.width * 0.5);
+          c3.height = Math.round(canvas.height * 0.5);
+          c3.getContext("2d").drawImage(canvas, 0, 0, c3.width, c3.height);
+          result = c3.toDataURL("image/jpeg", 0.15);
+        }
 
         console.log("[照片] 压缩完成:", (result.length / 1024).toFixed(1), "KB");
+
+        // 最终硬性检查：如果超过 100KB，拒绝（防止白屏）
+        if (result.length > 100000) {
+          console.error("[照片] 压缩后仍超过100KB，拒绝上传");
+          callback(null);
+          return;
+        }
+
         callback(result);
       } catch (e) {
         console.error("[照片] Canvas 压缩失败:", e);
@@ -1236,19 +1253,26 @@ const __vueApp = createApp({
     // ==================== 数据保存 ====================
 
     function saveAll(skipSync) {
-      try {
-        const data = {
-          project: JSON.parse(JSON.stringify(project)),
-          stages: JSON.parse(JSON.stringify(stages)),
-          tasks: JSON.parse(JSON.stringify(tasks)),
-          budget: JSON.parse(JSON.stringify(budget)),
-          photos: JSON.parse(JSON.stringify(photos)),
-          logs: JSON.parse(JSON.stringify(logs)).slice(0, 200)
-        };
-        saveData(data);
-      } catch (e) {
-        console.error("[存储] saveAll 序列化失败:", e);
-      }
+      // 非阻塞：延迟到下一个事件循环，避免卡 UI
+      var p = project, s = stages, t = tasks, b = budget, ph = photos, lg = logs;
+      setTimeout(function() {
+        try {
+          // 直接序列化响应式对象（Vue3 Proxy 兼容 JSON.stringify）
+          // 只做一次 stringify，不做 JSON.parse(JSON.stringify()) 深拷贝
+          var data = {
+            _version: DATA_VERSION,
+            project: p,
+            stages: s,
+            tasks: t,
+            budget: b,
+            photos: ph,
+            logs: lg
+          };
+          saveData(data);
+        } catch (e) {
+          console.error("[存储] saveAll 失败:", e);
+        }
+      }, 0);
       if (!skipSync) debouncedSync();
     }
 
@@ -1356,40 +1380,46 @@ const __vueApp = createApp({
       localDataVersion = Date.now();
 
       try {
-        // 先序列化不含照片的轻量数据
-        const lightData = {
-          project: JSON.parse(JSON.stringify(project)),
-          stages: JSON.parse(JSON.stringify(stages)),
-          tasks: JSON.parse(JSON.stringify(tasks)),
-          budget: JSON.parse(JSON.stringify(budget)),
+        // 直接从响应式对象构建数据，只做一次 stringify
+        var data = {
+          project: project,
+          stages: stages,
+          tasks: tasks,
+          budget: budget,
           photos: [],
-          logs: JSON.parse(JSON.stringify(logs)).slice(0, 100),
+          logs: logs.slice(0, 100),
           timestamp: localDataVersion
         };
 
-        let msg = JSON.stringify(lightData);
+        var msg = JSON.stringify(data);
 
-        // 如果轻量数据小于 200KB，尝试带上照片
-        if (msg.length < 200 * 1024 && photos.length > 0) {
+        // 如果轻量数据小于 200KB 且有照片，尝试带上照片
+        if (photos.length > 0 && msg.length < 200 * 1024) {
+          // 先检查照片数据大小
+          var photosJson;
           try {
-            const fullData = Object.assign({}, lightData, {
-              photos: JSON.parse(JSON.stringify(photos))
-            });
-            const fullMsg = JSON.stringify(fullData);
-            if (fullMsg.length < 500 * 1024) {
-              msg = fullMsg;
-            } else {
-              // 照片太大，只同步元数据
-              const metaPhotos = photos.map(function(p) {
-                return { id: p.id, stage: p.stage, uploadBy: p.uploadBy,
-                         description: p.description, uploadDate: p.uploadDate, url: "" };
-              });
-              lightData.photos = metaPhotos;
-              msg = JSON.stringify(lightData);
-              console.log("[MQTT] 照片较大，仅同步元数据");
-            }
+            photosJson = JSON.stringify(photos);
           } catch(e) {
-            console.log("[MQTT] 照片序列化失败，仅同步文本:", e.message);
+            // 序列化失败，只同步元数据
+            photosJson = JSON.stringify(photos.map(function(p) {
+              return { id: p.id, stage: p.stage, uploadBy: p.uploadBy,
+                       description: p.description, uploadDate: p.uploadDate, url: "" };
+            }));
+            console.log("[MQTT] 照片序列化降级为元数据");
+          }
+
+          if (msg.length + photosJson.length < 500 * 1024) {
+            // 重建完整消息（只做一次 stringify）
+            data.photos = JSON.parse(photosJson);
+            msg = JSON.stringify(data);
+          } else {
+            // 照片太大，只同步元数据
+            data.photos = photos.map(function(p) {
+              return { id: p.id, stage: p.stage, uploadBy: p.uploadBy,
+                       description: p.description, uploadDate: p.uploadDate, url: "" };
+            });
+            msg = JSON.stringify(data);
+            console.log("[MQTT] 数据较大，仅同步元数据");
           }
         }
 
@@ -1573,18 +1603,18 @@ const __vueApp = createApp({
     // ==================== 数据导出/导入 ====================
 
     function exportData() {
-      const data = {
-        project: JSON.parse(JSON.stringify(project)),
-        stages: JSON.parse(JSON.stringify(stages)),
-        tasks: JSON.parse(JSON.stringify(tasks)),
-        budget: JSON.parse(JSON.stringify(budget)),
-        photos: JSON.parse(JSON.stringify(photos)),
-        logs: JSON.parse(JSON.stringify(logs)),
+      var data = {
+        project: project,
+        stages: stages,
+        tasks: tasks,
+        budget: budget,
+        photos: photos,
+        logs: logs,
         exportDate: new Date().toISOString()
       };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
       a.href = url;
       a.download = "装修数据_" + todayStr() + ".json";
       a.click();
@@ -1692,6 +1722,9 @@ const __vueApp = createApp({
 
 __vueApp.config.errorHandler = function(err, instance, info) {
   console.error('[Vue错误]', err, info);
+  if (window.__showError) {
+    window.__showError('Vue渲染错误: ' + (err && err.message ? err.message : String(err)) + ' | ' + info);
+  }
 };
 __vueApp.mount("#app");
 
