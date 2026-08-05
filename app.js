@@ -417,6 +417,25 @@ createApp({
       showToast(editingExpense.id ? "已更新" : "已添加");
     }
 
+    // ==================== 项目编辑 ====================
+
+    const showProjectModal = ref(false);
+    const editingProject = reactive({
+      name: "", address: "", startDate: "", endDate: "", totalBudget: 0
+    });
+
+    function openProjectModal() {
+      Object.assign(editingProject, JSON.parse(JSON.stringify(project)));
+      showProjectModal.value = true;
+    }
+
+    function saveProject() {
+      Object.assign(project, JSON.parse(JSON.stringify(editingProject)));
+      showProjectModal.value = false;
+      saveAll();
+      showToast("项目信息已保存");
+    }
+
     // ==================== 流程管理 ====================
 
     const showStageModal = ref(false);
@@ -940,6 +959,7 @@ createApp({
       // 弹窗状态
       showTaskModal, editingTask,
       showExpenseModal, editingExpense,
+      showProjectModal, editingProject, openProjectModal, saveProject,
       showStageModal, editingStage, openAddStageModal, deleteStage,
       showPhotoDetail, viewingPhoto,
       showPhotoUpload, newPhoto, photoInput,
