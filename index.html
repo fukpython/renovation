@@ -10,6 +10,12 @@
 </head>
 <body>
 <div id="app" v-cloak>
+  <!-- Vue 加载前的占位符，Vue mount 后会被替换 -->
+  <div id="__loadingScreen" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;font-family:sans-serif;color:#999;">
+    <div style="width:32px;height:32px;border:3px solid #07c160;border-top-color:transparent;border-radius:50%;animation:__spin 0.8s linear infinite;"></div>
+    <div>装修管家加载中...</div>
+  </div>
+  <style>#__loadingScreen{opacity:1;transition:opacity 0.3s}@keyframes __spin{to{transform:rotate(360deg)}}</style>
 
   <!-- ===================== 顶部状态栏 ===================== -->
   <div class="status-bar">
@@ -959,12 +965,32 @@
 
 <script>
 // 全局错误处理，防止白屏
+window.__showError = function(msg) {
+  var div = document.getElementById('__errorBanner');
+  if (!div) {
+    div = document.createElement('div');
+    div.id = '__errorBanner';
+    div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#e74c3c;color:#fff;padding:10px 16px;font-size:13px;font-family:sans-serif;word-break:break-all;max-height:30vh;overflow-y:auto;';
+    document.body.appendChild(div);
+  }
+  div.textContent = msg;
+  div.style.display = 'block';
+};
 window.addEventListener('error', function(e) {
   console.error('[全局错误]', e.error || e.message);
+  window.__showError('页面错误: ' + (e.error && e.error.message ? e.error.message : e.message || '未知错误'));
 });
 window.addEventListener('unhandledrejection', function(e) {
   console.error('[未处理Promise]', e.reason);
+  window.__showError('异步错误: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
 });
+// 超时检测：10秒后如果加载界面还在，说明 Vue 加载失败
+setTimeout(function() {
+  var ls = document.getElementById('__loadingScreen');
+  if (ls && ls.style.display !== 'none') {
+    window.__showError('应用加载超时，请检查网络或刷新页面。如果使用 CDN 被墙，请尝试科学上网或刷新。');
+  }
+}, 10000);
 </script>
 <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 <script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
