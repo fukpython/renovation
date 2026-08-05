@@ -527,6 +527,129 @@ createApp({
       showToast(`${stage.name} 已完成`);
     }
 
+    // ==================== 流程拖拽排序 ====================
+
+    const dragState = reactive({
+      isDragging: false,
+      dragOccurred: false,
+      stageId: null,
+      startIdx: -1,
+      targetIdx: -1,
+      startY: 0,
+      offsetY: 0,
+      timer: null
+    });
+
+    // 触摸开始 — 长按 500ms 进入拖拽
+    function onDragStart(e, stage, idx) {
+      if (dragState.isDragging) return;
+      dragState.stageId = stage.id;
+      dragState.startIdx = idx;
+      dragState.startY = e.touches[0].clientY;
+      dragState.timer = setTimeout(() => {
+        dragState.isDragging = true;
+        dragState.dragOccurred = true;
+        if (navigator.vibrate) navigator.vibrate(30);
+      }, 500);
+    }
+
+    // 触摸移动
+    function onDragMove(e) {
+      if (!dragState.isDragging) {
+        // 移动超过 10px 取消长按
+        if (dragState.timer && Math.abs(e.touches[0].clientY - dragState.startY) > 10) {
+          clearTimeout(dragState.timer);
+          dragState.timer = null;
+        }
+        return;
+      }
+      e.preventDefault();
+      const touch = e.touches[0];
+      dragState.offsetY = touch.clientY - dragState.startY;
+      updateDragTarget(touch.clientY);
+    }
+
+    // 触摸结束
+    function onDragEnd() {
+      if (dragState.timer) {
+        clearTimeout(dragState.timer);
+        dragState.timer = null;
+      }
+      if (dragState.isDragging) {
+        commitReorder();
+      }
+      // 延迟清除 dragOccurred 防止 click 误触
+      setTimeout(() => { dragState.dragOccurred = false; }, 200);
+      dragState.isDragging = false;
+      dragState.stageId = null;
+      dragState.startIdx = -1;
+      dragState.targetIdx = -1;
+      dragState.offsetY = 0;
+    }
+
+    // 桌面端鼠标拖拽
+    function onMouseDragStart(e, stage, idx) {
+      e.preventDefault();
+      dragState.stageId = stage.id;
+      dragState.startIdx = idx;
+      dragState.startY = e.clientY;
+      dragState.isDragging = true;
+      dragState.dragOccurred = true;
+
+      const onMove = (ev) => {
+        dragState.offsetY = ev.clientY - dragState.startY;
+        updateDragTarget(ev.clientY);
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        commitReorder();
+        setTimeout(() => { dragState.dragOccurred = false; }, 200);
+        dragState.isDragging = false;
+        dragState.stageId = null;
+        dragState.startIdx = -1;
+        dragState.targetIdx = -1;
+        dragState.offsetY = 0;
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    }
+
+    // 查找当前手指/鼠标所在位置对应的目标索引
+    function updateDragTarget(clientY) {
+      const cards = document.querySelectorAll("[data-drag-id]");
+      let found = -1;
+      for (let i = 0; i < cards.length; i++) {
+        const rect = cards[i].getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (clientY < midY) {
+          found = i;
+          break;
+        }
+      }
+      if (found === -1) found = cards.length - 1;
+      if (found !== dragState.targetIdx) {
+        dragState.targetIdx = found;
+      }
+    }
+
+    // 执行数组重排
+    function commitReorder() {
+      if (dragState.targetIdx === -1 || dragState.targetIdx === dragState.startIdx) return;
+      const moved = stages.splice(dragState.startIdx, 1)[0];
+      let insertAt = dragState.targetIdx;
+      if (insertAt > dragState.startIdx) insertAt--;
+      stages.splice(insertAt, 0, moved);
+      saveAll();
+      showToast("顺序已更新");
+    }
+
+    // 防止拖拽后误触发点击
+    function onStageClick(stage) {
+      if (dragState.dragOccurred) return;
+      openStageModal(stage);
+    }
+
     // ==================== 现场照片 ====================
 
     const photoFilter = ref("all");
@@ -989,7 +1112,10 @@ createApp({
       // 同步状态
       syncStatus, lastSyncTime, isSyncing, retryConnect,
       // 导出导入
-      exportData, importData
+      exportData, importData,
+      // 拖拽排序
+      dragState, onDragStart, onDragMove, onDragEnd,
+      onMouseDragStart, onStageClick
     };
   }
 }).mount("#app");
