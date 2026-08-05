@@ -366,9 +366,13 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ============ 现场照片 ============ -->
+      <!-- 添加阶段按钮 -->
+      <button class="btn-add-stage" @click="openAddStageModal()">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>添加阶段</span>
+      </button>
+    </div>
     <div v-show="currentTab === 'photos'" class="page page-photos">
 
       <!-- 阶段筛选 -->
@@ -500,10 +504,14 @@
   <div class="modal-overlay" v-if="showStageModal" @click.self="showStageModal = false">
     <div class="modal-content">
       <div class="modal-header">
-        <span class="modal-title">编辑阶段 - {{ editingStage.name }}</span>
+        <span class="modal-title">{{ editingStage.id ? '编辑阶段' : '添加阶段' }}</span>
         <span class="modal-close" @click="showStageModal = false">&times;</span>
       </div>
       <div class="modal-body">
+        <div class="form-group">
+          <label>阶段名称</label>
+          <input type="text" v-model="editingStage.name" placeholder="如：防水工程、暖通安装" />
+        </div>
         <div class="form-group">
           <label>状态</label>
           <select v-model="editingStage.status">
@@ -533,6 +541,7 @@
         </div>
       </div>
       <div class="modal-footer">
+        <button class="btn-modal btn-danger" v-if="editingStage.id" @click="deleteStage(editingStage); showStageModal = false">删除</button>
         <button class="btn-modal btn-cancel" @click="showStageModal = false">取消</button>
         <button class="btn-modal btn-confirm" @click="saveStage">保存</button>
       </div>
