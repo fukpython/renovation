@@ -4,7 +4,7 @@
  * v4: 全量优化版 - 桌面端入口/支出删除/照片存储/MQTT冲突/延期标记/批量上传/日期分组/搜索/操作记录/今日要点/分类自定义/阶段预算/验收记录
  */
 
-const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
+const { createApp, ref, reactive, shallowReactive, computed, onMounted, watch, nextTick } = Vue;
 
 /* ===================== 默认数据 ===================== */
 
@@ -92,7 +92,14 @@ function loadData() {
       const parsed = JSON.parse(saved);
       const version = parsed._version || 1;
 
-      const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
+      // 浅拷贝默认数据（DEFAULT_DATA 是常量，不会被修改）
+      var merged = Object.assign({}, DEFAULT_DATA, parsed);
+      merged.stages = parsed.stages || DEFAULT_DATA.stages;
+      merged.tasks = parsed.tasks || DEFAULT_DATA.tasks;
+      merged.budget = parsed.budget || DEFAULT_DATA.budget;
+      merged.photos = parsed.photos || [];
+      merged.logs = parsed.logs || [];
+      merged.project = parsed.project || DEFAULT_DATA.project;
 
       // v1 -> v2: 插入新阶段
       if (version < 2) {
@@ -105,17 +112,17 @@ function loadData() {
             const existing = merged.stages.find(s => s.name === ds.name);
             reordered.push(existing);
           } else {
-            reordered.push(JSON.parse(JSON.stringify(ds)));
+            reordered.push(Object.assign({}, ds));
           }
         }
         merged.stages = reordered;
         const existingBudgetItems = (merged.budget || []).map(b => b.item);
         for (const db of DEFAULT_DATA.budget) {
-          if (!existingBudgetItems.includes(db.item)) merged.budget.push(JSON.parse(JSON.stringify(db)));
+          if (!existingBudgetItems.includes(db.item)) merged.budget.push(Object.assign({}, db));
         }
         const existingTaskNames = (merged.tasks || []).map(t => t.name);
         for (const dt of DEFAULT_DATA.tasks) {
-          if (!existingTaskNames.includes(dt.name)) merged.tasks.push(JSON.parse(JSON.stringify(dt)));
+          if (!existingTaskNames.includes(dt.name)) merged.tasks.push(Object.assign({}, dt));
         }
       }
 
@@ -134,13 +141,21 @@ function loadData() {
       if (!merged.logs) merged.logs = [];
 
       merged._version = DATA_VERSION;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      // 只在版本升级时才写回 localStorage，避免每次加载都序列化
+      if (version < DATA_VERSION) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch(e) {}
+      }
       return merged;
     }
   } catch (e) {
     console.error("加载数据失败:", e);
   }
-  const fresh = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  var fresh = Object.assign({}, DEFAULT_DATA);
+  fresh.stages = DEFAULT_DATA.stages.map(s => Object.assign({}, s));
+  fresh.tasks = DEFAULT_DATA.tasks.map(t => Object.assign({}, t));
+  fresh.budget = DEFAULT_DATA.budget.map(b => Object.assign({}, b));
+  fresh.photos = [];
+  fresh.logs = [];
   fresh._version = DATA_VERSION;
   return fresh;
 }
@@ -292,7 +307,7 @@ const __vueApp = createApp({
     const stages = reactive(savedData.stages);
     const tasks = reactive(savedData.tasks);
     const budget = reactive(savedData.budget);
-    const photos = reactive(savedData.photos);
+    const photos = shallowReactive(savedData.photos);
     const logs = reactive(savedData.logs || []);
 
     // ---- 当前页签 ----
