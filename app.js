@@ -1703,7 +1703,7 @@ const __vueApp = createApp({
       showBudgetEditModal, editingTotalBudget, openBudgetEditModal, saveTotalBudget,
       showStageModal, editingStage, openAddStageModal, deleteStage,
       showPhotoDetail, viewingPhoto,
-      showPhotoUpload, newPhoto, photoInput,
+      showPhotoUpload, newPhoto, photoInput, batchPhotoQueue, batchPhotoIndex,
       showLogModal, showCategoryModal, newCategoryName,
       toastMessage,
       // 计算属性
