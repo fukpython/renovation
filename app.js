@@ -1,6 +1,7 @@
 /**
  * 装修管家 - Vue 3 应用
  * 白哥家装修进度管理工具
+ * v4: 全量优化版 - 桌面端入口/支出删除/照片存储/MQTT冲突/延期标记/批量上传/日期分组/搜索/操作记录/今日要点/分类自定义/阶段预算/验收记录
  */
 
 const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
@@ -16,16 +17,16 @@ const DEFAULT_DATA = {
     totalBudget: 250000
   },
   stages: [
-    { id: 1, name: "设计确认", startDate: "2026-08-10", endDate: "2026-08-15", status: "pending", contractor: "", notes: "" },
-    { id: 2, name: "主体拆改", startDate: "2026-08-16", endDate: "2026-08-22", status: "pending", contractor: "", notes: "" },
-    { id: 3, name: "阳台封窗", startDate: "2026-08-23", endDate: "2026-08-30", status: "pending", contractor: "", notes: "" },
-    { id: 4, name: "水电改造", startDate: "2026-08-31", endDate: "2026-09-10", status: "pending", contractor: "", notes: "" },
-    { id: 5, name: "泥瓦工程", startDate: "2026-09-11", endDate: "2026-09-30", status: "pending", contractor: "", notes: "" },
-    { id: 6, name: "木工工程", startDate: "2026-10-01", endDate: "2026-10-15", status: "pending", contractor: "", notes: "" },
-    { id: 7, name: "油漆工程", startDate: "2026-10-16", endDate: "2026-11-05", status: "pending", contractor: "", notes: "" },
-    { id: 8, name: "全屋定制", startDate: "2026-11-06", endDate: "2026-11-20", status: "pending", contractor: "", notes: "" },
-    { id: 9, name: "安装工程", startDate: "2026-11-21", endDate: "2026-12-05", status: "pending", contractor: "", notes: "" },
-    { id: 10, name: "软装入住", startDate: "2026-12-06", endDate: "2026-12-20", status: "pending", contractor: "", notes: "" }
+    { id: 1, name: "设计确认", startDate: "2026-08-10", endDate: "2026-08-15", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 2, name: "主体拆改", startDate: "2026-08-16", endDate: "2026-08-22", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 3, name: "阳台封窗", startDate: "2026-08-23", endDate: "2026-08-30", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 4, name: "水电改造", startDate: "2026-08-31", endDate: "2026-09-10", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 5, name: "泥瓦工程", startDate: "2026-09-11", endDate: "2026-09-30", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 6, name: "木工工程", startDate: "2026-10-01", endDate: "2026-10-15", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 7, name: "油漆工程", startDate: "2026-10-16", endDate: "2026-11-05", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 8, name: "全屋定制", startDate: "2026-11-06", endDate: "2026-11-20", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 9, name: "安装工程", startDate: "2026-11-21", endDate: "2026-12-05", status: "pending", contractor: "", notes: "", acceptedItems: [] },
+    { id: 10, name: "软装入住", startDate: "2026-12-06", endDate: "2026-12-20", status: "pending", contractor: "", notes: "", acceptedItems: [] }
   ],
   tasks: [
     { id: 1, name: "户型测量与设计方案", stage: "设计确认", startDate: "2026-08-10", endDate: "2026-08-13", status: "pending", progress: 0 },
@@ -56,13 +57,33 @@ const DEFAULT_DATA = {
     { id: 14, category: "家具", item: "家具", budgetAmount: 35000, actualAmount: 0 },
     { id: 15, category: "软装", item: "软装布置", budgetAmount: 15000, actualAmount: 0 }
   ],
-  photos: []
+  photos: [],
+  logs: []
 };
+
+/* ===================== 验收项模板 ===================== */
+
+const ACCEPTANCE_TEMPLATES = {
+  "设计确认": ["方案确认", "图纸定稿", "预算确认"],
+  "主体拆改": ["拆改范围确认", "垃圾清运完成", "墙体安全检查"],
+  "阳台封窗": ["窗框安装验收", "密封性测试", "排水测试"],
+  "水电改造": ["水压试验", "电路绝缘测试", "点位确认", "管线路径确认"],
+  "泥瓦工程": ["防水闭水试验", "瓷砖空鼓检查", "平整度检查"],
+  "木工工程": ["结构牢固检查", "尺寸核对", "表面平整检查"],
+  "油漆工程": ["基层处理检查", "色差检查", "漆面完成确认"],
+  "全屋定制": ["尺寸复尺确认", "安装牢固检查", "五金配件检查"],
+  "安装工程": ["功能测试", "外观检查", "收口细节确认"],
+  "软装入住": ["清洁验收", "空气质量检测", "入住确认"]
+};
+
+function getAcceptanceItems(stageName) {
+  return ACCEPTANCE_TEMPLATES[stageName] || ["完工验收"];
+}
 
 /* ===================== 数据持久化 ===================== */
 
 const STORAGE_KEY = "renovation_app_data";
-const DATA_VERSION = 2; // v2: 新增阳台封窗、全屋定制阶段
+const DATA_VERSION = 3; // v3: 加 logs, acceptedItems, 照片存储优化
 
 function loadData() {
   try {
@@ -71,51 +92,49 @@ function loadData() {
       const parsed = JSON.parse(saved);
       const version = parsed._version || 1;
 
-      // 合并默认数据，防止字段缺失
       const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
 
-      // v1 → v2 迁移：插入新阶段
+      // v1 -> v2: 插入新阶段
       if (version < 2) {
         const newStageNames = ["阳台封窗", "全屋定制"];
         const existingNames = (merged.stages || []).map(s => s.name);
         const defaultStages = DEFAULT_DATA.stages;
-
-        // 按默认顺序重建 stages 数组
         const reordered = [];
         for (const ds of defaultStages) {
           if (existingNames.includes(ds.name)) {
-            // 用已有的数据
             const existing = merged.stages.find(s => s.name === ds.name);
             reordered.push(existing);
           } else {
-            // 新阶段，用默认数据
             reordered.push(JSON.parse(JSON.stringify(ds)));
           }
         }
         merged.stages = reordered;
-
-        // 合并新预算项
         const existingBudgetItems = (merged.budget || []).map(b => b.item);
         for (const db of DEFAULT_DATA.budget) {
-          if (!existingBudgetItems.includes(db.item)) {
-            merged.budget.push(JSON.parse(JSON.stringify(db)));
-          }
+          if (!existingBudgetItems.includes(db.item)) merged.budget.push(JSON.parse(JSON.stringify(db)));
         }
-
-        // 合并新任务
         const existingTaskNames = (merged.tasks || []).map(t => t.name);
         for (const dt of DEFAULT_DATA.tasks) {
-          if (!existingTaskNames.includes(dt.name)) {
-            merged.tasks.push(JSON.parse(JSON.stringify(dt)));
-          }
+          if (!existingTaskNames.includes(dt.name)) merged.tasks.push(JSON.parse(JSON.stringify(dt)));
         }
-
-        merged._version = DATA_VERSION;
-        // 保存迁移后的数据
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-        console.log("[迁移] 数据已从 v1 升级到 v2");
       }
 
+      // v2 -> v3: 加 logs, acceptedItems
+      if (version < 3) {
+        if (!merged.logs) merged.logs = [];
+        (merged.stages || []).forEach(s => {
+          if (!s.acceptedItems) s.acceptedItems = [];
+        });
+      }
+
+      // 确保 stages 有 acceptedItems
+      (merged.stages || []).forEach(s => {
+        if (!s.acceptedItems) s.acceptedItems = [];
+      });
+      if (!merged.logs) merged.logs = [];
+
+      merged._version = DATA_VERSION;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       return merged;
     }
   } catch (e) {
@@ -129,11 +148,32 @@ function loadData() {
 function saveData(data) {
   try {
     data._version = DATA_VERSION;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+    // 照片存储优化：如果数据太大，压缩旧照片
+    let jsonStr = JSON.stringify(data);
+    if (jsonStr.length > 4 * 1024 * 1024) {
+      // 超过4MB，删除最旧的照片直到降到3MB以下
+      while (jsonStr.length > 3 * 1024 * 1024 && data.photos.length > 10) {
+        data.photos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+        data.photos = data.photos.slice(0, Math.floor(data.photos.length * 0.8));
+        jsonStr = JSON.stringify(data);
+      }
+      console.log("[存储优化] 照片已压缩至", data.photos.length, "张");
+    }
+
+    localStorage.setItem(STORAGE_KEY, jsonStr);
   } catch (e) {
     console.error("保存数据失败:", e);
     if (e.name === "QuotaExceededError") {
-      showToast("存储空间不足，照片可能过多");
+      // 紧急删除一半照片
+      try {
+        data.photos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+        data.photos = data.photos.slice(0, Math.ceil(data.photos.length / 2));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        console.log("[存储] 紧急清理照片");
+      } catch (e2) {
+        console.error("存储彻底失败:", e2);
+      }
     }
   }
 }
@@ -157,6 +197,29 @@ function daysBetween(start, end) {
   return Math.ceil((e - s) / (1000 * 60 * 60 * 24));
 }
 
+/* ===================== 图片压缩 ===================== */
+
+function compressImage(file, callback) {
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      const maxW = 480, maxH = 360;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      if (h > maxH) { w = w * maxH / h; h = maxH; }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL("image/jpeg", 0.4));
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 /* ===================== Vue 应用 ===================== */
 
 createApp({
@@ -168,6 +231,7 @@ createApp({
     const tasks = reactive(savedData.tasks);
     const budget = reactive(savedData.budget);
     const photos = reactive(savedData.photos);
+    const logs = reactive(savedData.logs || []);
 
     // ---- 当前页签 ----
     const currentTab = ref("dashboard");
@@ -179,7 +243,6 @@ createApp({
       { id: "photos", label: "现场", svg: '<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>' }
     ];
 
-    // ---- 导航标题 ----
     const navTitle = computed(() => {
       const tab = tabs.find(t => t.id === currentTab.value);
       return tab ? tab.label : "装修管家";
@@ -229,17 +292,83 @@ createApp({
       return "¥" + Number(amount).toLocaleString("zh-CN");
     }
 
+    // ==================== 操作记录 (任务20) ====================
+
+    function addLog(action, detail) {
+      const log = {
+        id: Date.now() + Math.random(),
+        action: action,
+        detail: detail || "",
+        time: new Date().toLocaleString("zh-CN"),
+        timestamp: Date.now()
+      };
+      logs.unshift(log);
+      if (logs.length > 200) logs.splice(200);
+    }
+
+    const showLogModal = ref(false);
+
+    function formatLogAction(action) {
+      const map = {
+        "add": "新增",
+        "edit": "编辑",
+        "delete": "删除",
+        "start": "开始",
+        "complete": "完成",
+        "reorder": "排序",
+        "budget": "预算",
+        "acceptance": "验收",
+        "sync": "同步"
+      };
+      return map[action] || action;
+    }
+
     // ==================== 计算属性 ====================
 
-    // ---- 总进度（基于阶段完成情况）----
+    // ---- 延期自动检查 (任务16) ----
+    function isOverdue(item) {
+      if (item.status === "completed") return false;
+      const today = new Date(todayStr());
+      const end = new Date(item.endDate);
+      return today > end;
+    }
+
+    function getEffectiveStatus(item) {
+      if (item.status === "completed") return "completed";
+      if (isOverdue(item)) return "delayed";
+      return item.status;
+    }
+
+    function checkDelayed() {
+      let changed = false;
+      tasks.forEach(t => {
+        const eff = getEffectiveStatus(t);
+        if (eff === "delayed" && t.status !== "delayed") {
+          t.status = "delayed";
+          changed = true;
+        }
+      });
+      stages.forEach(s => {
+        const eff = getEffectiveStatus(s);
+        if (eff === "delayed" && s.status !== "delayed") {
+          s.status = "delayed";
+          changed = true;
+        }
+      });
+      if (changed) {
+        addLog("sync", "自动标记延期任务");
+      }
+    }
+
+    // ---- 总进度 ----
     const overallProgress = computed(() => {
       if (stages.length === 0) return 0;
       const completed = stages.filter(s => s.status === "completed").length;
       const inProgress = stages.filter(s => s.status === "in-progress").length;
-      return Math.round((completed + inProgress * 0.5) / stages.length * 100);
+      const delayed = stages.filter(s => s.status === "delayed").length;
+      return Math.round((completed + inProgress * 0.5 + delayed * 0.3) / stages.length * 100);
     });
 
-    // ---- 已施工天数 ----
     const daysElapsed = computed(() => {
       const today = new Date(todayStr());
       const start = new Date(project.startDate);
@@ -247,7 +376,6 @@ createApp({
       return Math.max(0, daysBetween(project.startDate, todayStr()));
     });
 
-    // ---- 剩余天数 ----
     const daysRemaining = computed(() => {
       const today = new Date(todayStr());
       const end = new Date(project.endDate);
@@ -255,33 +383,27 @@ createApp({
       return Math.max(0, daysBetween(todayStr(), project.endDate));
     });
 
-    // ---- 已完成阶段数 ----
-    const completedStages = computed(() => {
-      return stages.filter(s => s.status === "completed").length;
+    const completedStages = computed(() => stages.filter(s => s.status === "completed").length);
+
+    const delayedCount = computed(() => {
+      return tasks.filter(t => getEffectiveStatus(t) === "delayed").length +
+             stages.filter(s => getEffectiveStatus(s) === "delayed").length;
     });
 
-    // ---- 当前阶段（第一个非完成阶段）----
     const currentStage = computed(() => {
       return stages.find(s => s.status === "in-progress") ||
              stages.find(s => s.status === "pending") ||
+             stages.find(s => s.status === "delayed") ||
              null;
     });
 
     // ---- 预算计算 ----
-    const totalSpent = computed(() => {
-      return budget.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0);
-    });
+    const totalSpent = computed(() => budget.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0));
+    const remainingBudget = computed(() => project.totalBudget - totalSpent.value);
+    const budgetProgress = computed(() => project.totalBudget === 0 ? 0 : (totalSpent.value / project.totalBudget) * 100);
 
-    const remainingBudget = computed(() => {
-      return project.totalBudget - totalSpent.value;
-    });
+    const totalAllocatedBudget = computed(() => budget.reduce((sum, item) => sum + (Number(item.budgetAmount) || 0), 0));
 
-    const budgetProgress = computed(() => {
-      if (project.totalBudget === 0) return 0;
-      return (totalSpent.value / project.totalBudget) * 100;
-    });
-
-    // ---- 预算分类汇总 ----
     const budgetCategories = computed(() => {
       const map = {};
       budget.forEach(item => {
@@ -299,35 +421,91 @@ createApp({
       return result;
     });
 
-    const categoryNames = computed(() => {
-      return [...new Set(budget.map(item => item.category))];
+    const categoryNames = computed(() => [...new Set(budget.map(item => item.category))]);
+
+    // ---- 阶段关联预算 (任务23) ----
+    const stageBudgets = computed(() => {
+      const map = {};
+      stages.forEach(s => {
+        const stageExpenses = budget.filter(b => b.item === s.name || b.category === s.name);
+        const stageBudget = stageExpenses.reduce((sum, b) => sum + (Number(b.budgetAmount) || 0), 0);
+        const stageSpent = stageExpenses.reduce((sum, b) => sum + (Number(b.actualAmount) || 0), 0);
+        map[s.id] = { budget: stageBudget, spent: stageSpent };
+      });
+      return map;
     });
+
+    function getStageBudget(stageId) {
+      const sb = stageBudgets.value[stageId];
+      if (!sb || sb.budget === 0) return null;
+      return sb;
+    }
 
     // ---- 最近照片 ----
     const recentPhotos = computed(() => {
-      return [...photos]
-        .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate))
-        .slice(0, 3);
+      return [...photos].sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate)).slice(0, 3);
     });
 
-    // ---- 待办任务（待开始 + 进行中，取前5个）----
+    // ---- 待办任务 ----
     const upcomingTasks = computed(() => {
       return tasks
-        .filter(t => t.status === "pending" || t.status === "in-progress")
+        .filter(t => t.status === "pending" || t.status === "in-progress" || t.status === "delayed")
         .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
         .slice(0, 5);
     });
+
+    // ---- 今日要点 (任务21) ----
+    const todayAlerts = computed(() => {
+      const today = todayStr();
+      const alerts = [];
+
+      // 今日到期的任务
+      const todayDue = tasks.filter(t => t.endDate === today && t.status !== "completed");
+      if (todayDue.length > 0) {
+        alerts.push({ type: "task", icon: "task", color: "warning", title: "今日到期任务", items: todayDue.map(t => t.name) });
+      }
+
+      // 超支的预算项
+      const overBudget = budget.filter(b => b.actualAmount > b.budgetAmount && b.budgetAmount > 0);
+      if (overBudget.length > 0) {
+        alerts.push({ type: "budget", icon: "budget", color: "danger", title: "预算超支项", items: overBudget.map(b => b.item) });
+      }
+
+      // 待验收的阶段（进行中但未完成全部验收项）
+      const pendingAcceptance = stages.filter(s => s.status === "in-progress" && s.acceptedItems && s.acceptedItems.length < getAcceptanceItems(s.name).length);
+      if (pendingAcceptance.length > 0) {
+        alerts.push({ type: "acceptance", icon: "check", color: "info", title: "待完成验收", items: pendingAcceptance.map(s => s.name) });
+      }
+
+      // 延期的任务
+      const delayedTasks = tasks.filter(t => getEffectiveStatus(t) === "delayed");
+      if (delayedTasks.length > 0) {
+        alerts.push({ type: "delayed", icon: "alert", color: "danger", title: "已延期任务", items: delayedTasks.map(t => t.name) });
+      }
+
+      return alerts;
+    });
+
+    // ==================== 搜索功能 (任务19) ====================
+
+    const searchQuery = ref("");
 
     // ==================== 工期管理 ====================
 
     const scheduleFilter = ref("all");
 
     const filteredTasks = computed(() => {
-      if (scheduleFilter.value === "all") return tasks;
-      return tasks.filter(t => t.status === scheduleFilter.value);
+      let result = tasks;
+      if (scheduleFilter.value !== "all") {
+        result = result.filter(t => getEffectiveStatus(t) === scheduleFilter.value);
+      }
+      if (searchQuery.value.trim()) {
+        const q = searchQuery.value.trim().toLowerCase();
+        result = result.filter(t => t.name.toLowerCase().includes(q) || (t.stage && t.stage.toLowerCase().includes(q)));
+      }
+      return result;
     });
 
-    // 任务弹窗
     const showTaskModal = ref(false);
     const editingTask = reactive({
       id: null, name: "", stage: "", startDate: "", endDate: "", status: "pending", progress: 0
@@ -354,11 +532,13 @@ createApp({
         const idx = tasks.findIndex(t => t.id === editingTask.id);
         if (idx > -1) {
           Object.assign(tasks[idx], JSON.parse(JSON.stringify(editingTask)));
+          addLog("edit", "编辑任务：" + editingTask.name);
         }
       } else {
         const newTask = JSON.parse(JSON.stringify(editingTask));
         newTask.id = Date.now();
         tasks.push(newTask);
+        addLog("add", "新增任务：" + editingTask.name);
       }
       showTaskModal.value = false;
       saveAll();
@@ -366,9 +546,10 @@ createApp({
     }
 
     function deleteTask(task) {
-      if (!confirm(`确认删除"${task.name}"？`)) return;
+      if (!confirm("确认删除\"" + task.name + "\"？")) return;
       const idx = tasks.findIndex(t => t.id === task.id);
       if (idx > -1) tasks.splice(idx, 1);
+      addLog("delete", "删除任务：" + task.name);
       saveAll();
       showToast("已删除");
     }
@@ -376,6 +557,7 @@ createApp({
     function startTask(task) {
       task.status = "in-progress";
       task.progress = 10;
+      addLog("start", "开始任务：" + task.name);
       saveAll();
       showToast("已开始");
     }
@@ -383,6 +565,7 @@ createApp({
     function completeTask(task) {
       task.status = "completed";
       task.progress = 100;
+      addLog("complete", "完成任务：" + task.name);
       saveAll();
       showToast("已完成");
     }
@@ -415,15 +598,74 @@ createApp({
         const idx = budget.findIndex(b => b.id === editingExpense.id);
         if (idx > -1) {
           Object.assign(budget[idx], JSON.parse(JSON.stringify(editingExpense)));
+          addLog("edit", "编辑支出项：" + editingExpense.item);
         }
       } else {
         const newExpense = JSON.parse(JSON.stringify(editingExpense));
         newExpense.id = Date.now();
         budget.push(newExpense);
+        addLog("add", "新增支出项：" + editingExpense.item);
       }
       showExpenseModal.value = false;
       saveAll();
       showToast(editingExpense.id ? "已更新" : "已添加");
+    }
+
+    // 支出删除 (任务13)
+    function deleteExpense(expense) {
+      if (!confirm("确认删除\"" + expense.item + "\"？")) return;
+      const idx = budget.findIndex(b => b.id === expense.id);
+      if (idx > -1) {
+        budget.splice(idx, 1);
+        addLog("delete", "删除支出项：" + expense.item);
+        saveAll();
+        showToast("已删除");
+      }
+    }
+
+    // ==================== 预算分类自定义 (任务22) ====================
+
+    const showCategoryModal = ref(false);
+    const newCategoryName = ref("");
+
+    function openCategoryModal() {
+      newCategoryName.value = "";
+      showCategoryModal.value = true;
+    }
+
+    function addCategory() {
+      const name = newCategoryName.value.trim();
+      if (!name) {
+        showToast("请输入分类名称");
+        return;
+      }
+      if (categoryNames.value.includes(name)) {
+        showToast("该分类已存在");
+        return;
+      }
+      // 添加一个空项作为分类载体
+      budget.push({
+        id: Date.now(),
+        category: name,
+        item: name + "（待编辑）",
+        budgetAmount: 0,
+        actualAmount: 0
+      });
+      addLog("add", "新增分类：" + name);
+      showCategoryModal.value = false;
+      saveAll();
+      showToast("分类已添加");
+    }
+
+    function deleteCategory(catName) {
+      const count = budget.filter(b => b.category === catName).length;
+      if (!confirm("删除分类\"" + catName + "\"及其下 " + count + " 个支出项？")) return;
+      for (let i = budget.length - 1; i >= 0; i--) {
+        if (budget[i].category === catName) budget.splice(i, 1);
+      }
+      addLog("delete", "删除分类：" + catName);
+      saveAll();
+      showToast("已删除分类");
     }
 
     // ==================== 项目编辑 ====================
@@ -440,9 +682,28 @@ createApp({
 
     function saveProject() {
       Object.assign(project, JSON.parse(JSON.stringify(editingProject)));
+      addLog("edit", "编辑项目信息");
       showProjectModal.value = false;
       saveAll();
       showToast("项目信息已保存");
+    }
+
+    // ==================== 总预算编辑 ====================
+
+    const showBudgetEditModal = ref(false);
+    const editingTotalBudget = ref(0);
+
+    function openBudgetEditModal() {
+      editingTotalBudget.value = project.totalBudget;
+      showBudgetEditModal.value = true;
+    }
+
+    function saveTotalBudget() {
+      project.totalBudget = editingTotalBudget.value;
+      addLog("budget", "修改总预算：" + formatMoney(editingTotalBudget.value));
+      showBudgetEditModal.value = false;
+      saveAll();
+      showToast("总预算已更新");
     }
 
     // ==================== 流程管理 ====================
@@ -470,21 +731,22 @@ createApp({
         return;
       }
       if (editingStage.id) {
-        // 编辑已有阶段
         const idx = stages.findIndex(s => s.id === editingStage.id);
         if (idx > -1) {
-          // 如果改了名字，同步更新任务和照片中的阶段名
           const oldName = stages[idx].name;
           if (oldName !== editingStage.name) {
             tasks.forEach(t => { if (t.stage === oldName) t.stage = editingStage.name; });
             photos.forEach(p => { if (p.stage === oldName) p.stage = editingStage.name; });
           }
           Object.assign(stages[idx], JSON.parse(JSON.stringify(editingStage)));
+          if (!stages[idx].acceptedItems) stages[idx].acceptedItems = [];
+          addLog("edit", "编辑阶段：" + editingStage.name);
         }
       } else {
-        // 新增阶段
         const maxId = stages.length > 0 ? Math.max(...stages.map(s => s.id)) : 0;
-        stages.push(Object.assign({}, JSON.parse(JSON.stringify(editingStage)), { id: maxId + 1 }));
+        const newStage = Object.assign({}, JSON.parse(JSON.stringify(editingStage)), { id: maxId + 1, acceptedItems: [] });
+        stages.push(newStage);
+        addLog("add", "新增阶段：" + editingStage.name);
       }
       showStageModal.value = false;
       saveAll();
@@ -492,10 +754,11 @@ createApp({
     }
 
     function deleteStage(stage) {
-      if (!confirm(`确定删除「${stage.name}」吗？关联的任务不会删除，但会失去阶段归属。`)) return;
+      if (!confirm("确定删除\"" + stage.name + "\"吗？关联的任务不会删除，但会失去阶段归属。")) return;
       const idx = stages.findIndex(s => s.id === stage.id);
       if (idx > -1) {
         stages.splice(idx, 1);
+        addLog("delete", "删除阶段：" + stage.name);
         saveAll();
         showToast("已删除");
       }
@@ -503,44 +766,63 @@ createApp({
 
     function startStage(stage) {
       stage.status = "in-progress";
-      // 自动将任务状态也更新
       tasks.forEach(t => {
         if (t.stage === stage.name && t.status === "pending") {
           t.status = "in-progress";
           t.progress = 10;
         }
       });
+      addLog("start", "开始阶段：" + stage.name);
       saveAll();
-      showToast(`${stage.name} 已开始`);
+      showToast(stage.name + " 已开始");
     }
 
     function completeStage(stage) {
       stage.status = "completed";
-      // 自动完成任务
       tasks.forEach(t => {
         if (t.stage === stage.name && t.status !== "completed") {
           t.status = "completed";
           t.progress = 100;
         }
       });
+      addLog("complete", "完成阶段：" + stage.name);
       saveAll();
-      showToast(`${stage.name} 已完成`);
+      showToast(stage.name + " 已完成");
+    }
+
+    // ==================== 阶段验收 (任务24) ====================
+
+    function toggleAcceptance(stage, item) {
+      if (!stage.acceptedItems) stage.acceptedItems = [];
+      const idx = stage.acceptedItems.indexOf(item);
+      if (idx > -1) {
+        stage.acceptedItems.splice(idx, 1);
+        addLog("acceptance", "取消验收：" + stage.name + " - " + item);
+      } else {
+        stage.acceptedItems.push(item);
+        addLog("acceptance", "验收通过：" + stage.name + " - " + item);
+      }
+      saveAll();
+    }
+
+    function isAccepted(stage, item) {
+      return stage.acceptedItems && stage.acceptedItems.includes(item);
+    }
+
+    function getAcceptanceProgress(stage) {
+      const items = getAcceptanceItems(stage.name);
+      if (items.length === 0) return 0;
+      const accepted = stage.acceptedItems ? stage.acceptedItems.length : 0;
+      return Math.round(accepted / items.length * 100);
     }
 
     // ==================== 流程拖拽排序 ====================
 
     const dragState = reactive({
-      isDragging: false,
-      dragOccurred: false,
-      stageId: null,
-      startIdx: -1,
-      targetIdx: -1,
-      startY: 0,
-      offsetY: 0,
-      timer: null
+      isDragging: false, dragOccurred: false, stageId: null,
+      startIdx: -1, targetIdx: -1, startY: 0, offsetY: 0, timer: null
     });
 
-    // 触摸开始 — 长按 500ms 进入拖拽
     function onDragStart(e, stage, idx) {
       if (dragState.isDragging) return;
       dragState.stageId = stage.id;
@@ -553,10 +835,8 @@ createApp({
       }, 500);
     }
 
-    // 触摸移动
     function onDragMove(e) {
       if (!dragState.isDragging) {
-        // 移动超过 10px 取消长按
         if (dragState.timer && Math.abs(e.touches[0].clientY - dragState.startY) > 10) {
           clearTimeout(dragState.timer);
           dragState.timer = null;
@@ -569,16 +849,9 @@ createApp({
       updateDragTarget(touch.clientY);
     }
 
-    // 触摸结束
     function onDragEnd() {
-      if (dragState.timer) {
-        clearTimeout(dragState.timer);
-        dragState.timer = null;
-      }
-      if (dragState.isDragging) {
-        commitReorder();
-      }
-      // 延迟清除 dragOccurred 防止 click 误触
+      if (dragState.timer) { clearTimeout(dragState.timer); dragState.timer = null; }
+      if (dragState.isDragging) commitReorder();
       setTimeout(() => { dragState.dragOccurred = false; }, 200);
       dragState.isDragging = false;
       dragState.stageId = null;
@@ -587,7 +860,6 @@ createApp({
       dragState.offsetY = 0;
     }
 
-    // 桌面端鼠标拖拽
     function onMouseDragStart(e, stage, idx) {
       e.preventDefault();
       dragState.stageId = stage.id;
@@ -595,7 +867,6 @@ createApp({
       dragState.startY = e.clientY;
       dragState.isDragging = true;
       dragState.dragOccurred = true;
-
       const onMove = (ev) => {
         dragState.offsetY = ev.clientY - dragState.startY;
         updateDragTarget(ev.clientY);
@@ -615,36 +886,30 @@ createApp({
       document.addEventListener("mouseup", onUp);
     }
 
-    // 查找当前手指/鼠标所在位置对应的目标索引
     function updateDragTarget(clientY) {
       const cards = document.querySelectorAll("[data-drag-id]");
       let found = -1;
       for (let i = 0; i < cards.length; i++) {
         const rect = cards[i].getBoundingClientRect();
+        if (rect.height === 0) continue;
         const midY = rect.top + rect.height / 2;
-        if (clientY < midY) {
-          found = i;
-          break;
-        }
+        if (clientY < midY) { found = i; break; }
       }
       if (found === -1) found = cards.length - 1;
-      if (found !== dragState.targetIdx) {
-        dragState.targetIdx = found;
-      }
+      if (found !== dragState.targetIdx) dragState.targetIdx = found;
     }
 
-    // 执行数组重排
     function commitReorder() {
       if (dragState.targetIdx === -1 || dragState.targetIdx === dragState.startIdx) return;
       const moved = stages.splice(dragState.startIdx, 1)[0];
       let insertAt = dragState.targetIdx;
       if (insertAt > dragState.startIdx) insertAt--;
       stages.splice(insertAt, 0, moved);
+      addLog("reorder", "调整阶段顺序");
       saveAll();
       showToast("顺序已更新");
     }
 
-    // 防止拖拽后误触发点击
     function onStageClick(stage) {
       if (dragState.dragOccurred) return;
       openStageModal(stage);
@@ -653,19 +918,13 @@ createApp({
     // ==================== 工期任务拖拽排序 ====================
 
     const taskDragState = reactive({
-      isDragging: false,
-      dragOccurred: false,
-      taskId: null,
-      startIdx: -1,
-      targetIdx: -1,
-      startY: 0,
-      offsetY: 0,
-      timer: null
+      isDragging: false, dragOccurred: false, taskId: null,
+      startIdx: -1, targetIdx: -1, startY: 0, offsetY: 0, timer: null
     });
 
     function onTaskDragStart(e, task, idx) {
       if (taskDragState.isDragging) return;
-      if (scheduleFilter.value !== 'all') return;
+      if (scheduleFilter.value !== "all" || searchQuery.value.trim()) return;
       taskDragState.taskId = task.id;
       taskDragState.startIdx = idx;
       taskDragState.startY = e.touches[0].clientY;
@@ -691,13 +950,8 @@ createApp({
     }
 
     function onTaskDragEnd() {
-      if (taskDragState.timer) {
-        clearTimeout(taskDragState.timer);
-        taskDragState.timer = null;
-      }
-      if (taskDragState.isDragging) {
-        commitTaskReorder();
-      }
+      if (taskDragState.timer) { clearTimeout(taskDragState.timer); taskDragState.timer = null; }
+      if (taskDragState.isDragging) commitTaskReorder();
       setTimeout(() => { taskDragState.dragOccurred = false; }, 200);
       taskDragState.isDragging = false;
       taskDragState.taskId = null;
@@ -713,7 +967,6 @@ createApp({
       taskDragState.startY = e.clientY;
       taskDragState.isDragging = true;
       taskDragState.dragOccurred = true;
-
       const onMove = (ev) => {
         taskDragState.offsetY = ev.clientY - taskDragState.startY;
         updateTaskDragTarget(ev.clientY);
@@ -740,15 +993,10 @@ createApp({
         const rect = cards[i].getBoundingClientRect();
         if (rect.height === 0) continue;
         const midY = rect.top + rect.height / 2;
-        if (clientY < midY) {
-          found = i;
-          break;
-        }
+        if (clientY < midY) { found = i; break; }
       }
       if (found === -1) found = cards.length - 1;
-      if (found !== taskDragState.targetIdx) {
-        taskDragState.targetIdx = found;
-      }
+      if (found !== taskDragState.targetIdx) taskDragState.targetIdx = found;
     }
 
     function commitTaskReorder() {
@@ -757,6 +1005,7 @@ createApp({
       let insertAt = taskDragState.targetIdx;
       if (insertAt > taskDragState.startIdx) insertAt--;
       tasks.splice(insertAt, 0, moved);
+      addLog("reorder", "调整任务顺序");
       saveAll();
       showToast("顺序已更新");
     }
@@ -766,79 +1015,68 @@ createApp({
       openTaskModal(task);
     }
 
-    // ==================== 总预算编辑 ====================
-
-    const showBudgetEditModal = ref(false);
-    const editingTotalBudget = ref(0);
-
-    const totalAllocatedBudget = computed(() => {
-      return budget.reduce((sum, item) => sum + (Number(item.budgetAmount) || 0), 0);
-    });
-
-    function openBudgetEditModal() {
-      editingTotalBudget.value = project.totalBudget;
-      showBudgetEditModal.value = true;
-    }
-
-    function saveTotalBudget() {
-      project.totalBudget = editingTotalBudget.value;
-      showBudgetEditModal.value = false;
-      saveAll();
-      showToast("总预算已更新");
-    }
-
     // ==================== 现场照片 ====================
 
     const photoFilter = ref("all");
+    const photoViewMode = ref("grid"); // grid | grouped
     const showPhotoDetail = ref(false);
     const showPhotoUpload = ref(false);
     const viewingPhoto = reactive({});
     const newPhoto = reactive({ url: "", stage: "", uploadBy: "", description: "" });
     const photoInput = ref(null);
+    const batchPhotoQueue = ref([]);
+    const batchPhotoIndex = ref(0);
 
     const filteredPhotos = computed(() => {
       if (photoFilter.value === "all") return photos;
       return photos.filter(p => p.stage === photoFilter.value);
     });
 
+    // 照片按日期分组 (任务18)
+    const groupedPhotos = computed(() => {
+      const map = {};
+      filteredPhotos.value.forEach(p => {
+        const date = p.uploadDate || "未知日期";
+        if (!map[date]) map[date] = { date: date, photos: [] };
+        map[date].photos.push(p);
+      });
+      return Object.values(map).sort((a, b) => new Date(b.date) - new Date(a.date));
+    });
+
     function triggerPhotoUpload() {
       photoInput.value?.click();
     }
 
+    // 批量上传 (任务17)
     function handlePhotoUpload(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+      const files = Array.from(e.target.files);
+      if (!files || files.length === 0) return;
 
-      // 压缩图片
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-          const canvas = document.createElement("canvas");
-          const maxW = 600, maxH = 450;
-          let w = img.width, h = img.height;
-          if (w > maxW) { h = h * maxW / w; w = maxW; }
-          if (h > maxH) { w = w * maxH / h; h = maxH; }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-          newPhoto.url = canvas.toDataURL("image/jpeg", 0.5);
+      batchPhotoQueue.value = files;
+      batchPhotoIndex.value = 0;
 
-          // 默认填充
-          const cs = currentStage.value;
-          newPhoto.stage = cs ? cs.name : (stages[0]?.name || "");
-          newPhoto.uploadBy = "";
-          newPhoto.description = "";
-
-          showPhotoUpload.value = true;
-        };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-
-      // 清空 input 以便重复选择同一文件
+      // 处理第一张照片
+      processNextBatchPhoto();
       e.target.value = "";
+    }
+
+    function processNextBatchPhoto() {
+      if (batchPhotoIndex.value >= batchPhotoQueue.value.length) {
+        showToast("已上传 " + batchPhotoQueue.value.length + " 张照片");
+        batchPhotoQueue.value = [];
+        batchPhotoIndex.value = 0;
+        return;
+      }
+
+      const file = batchPhotoQueue.value[batchPhotoIndex.value];
+      compressImage(file, (dataUrl) => {
+        const cs = currentStage.value;
+        newPhoto.url = dataUrl;
+        newPhoto.stage = cs ? cs.name : (stages[0]?.name || "");
+        newPhoto.uploadBy = "";
+        newPhoto.description = "";
+        showPhotoUpload.value = true;
+      });
     }
 
     function savePhoto() {
@@ -851,7 +1089,7 @@ createApp({
         return;
       }
       const photo = {
-        id: Date.now(),
+        id: Date.now() + Math.random(),
         url: newPhoto.url,
         stage: newPhoto.stage,
         uploadBy: newPhoto.uploadBy,
@@ -859,7 +1097,10 @@ createApp({
         uploadDate: todayStr()
       };
       photos.push(photo);
+      addLog("add", "上传照片：" + newPhoto.stage + (newPhoto.description ? " - " + newPhoto.description : ""));
       showPhotoUpload.value = false;
+
+      const currentBatchIndex = batchPhotoIndex.value;
 
       // 重置
       newPhoto.url = "";
@@ -867,7 +1108,27 @@ createApp({
       newPhoto.description = "";
 
       saveAll();
-      showToast("上传成功");
+
+      // 如果是批量上传，处理下一张
+      if (batchPhotoQueue.value.length > 0 && currentBatchIndex < batchPhotoQueue.value.length - 1) {
+        batchPhotoIndex.value = currentBatchIndex + 1;
+        setTimeout(() => processNextBatchPhoto(), 300);
+      } else {
+        showToast("上传成功");
+        batchPhotoQueue.value = [];
+        batchPhotoIndex.value = 0;
+      }
+    }
+
+    function skipPhoto() {
+      showPhotoUpload.value = false;
+      if (batchPhotoIndex.value < batchPhotoQueue.value.length - 1) {
+        batchPhotoIndex.value++;
+        setTimeout(() => processNextBatchPhoto(), 200);
+      } else {
+        batchPhotoQueue.value = [];
+        batchPhotoIndex.value = 0;
+      }
     }
 
     function openPhotoDetail(photo) {
@@ -888,6 +1149,7 @@ createApp({
       const idx = photos.findIndex(p => p.id === photo.id);
       if (idx > -1) photos.splice(idx, 1);
       showPhotoDetail.value = false;
+      addLog("delete", "删除照片");
       saveAll();
       showToast("已删除");
     }
@@ -900,21 +1162,23 @@ createApp({
         stages: JSON.parse(JSON.stringify(stages)),
         tasks: JSON.parse(JSON.stringify(tasks)),
         budget: JSON.parse(JSON.stringify(budget)),
-        photos: JSON.parse(JSON.stringify(photos))
+        photos: JSON.parse(JSON.stringify(photos)),
+        logs: JSON.parse(JSON.stringify(logs)).slice(0, 200)
       };
-      saveData(data); // localStorage 备份
+      saveData(data);
     }
 
-    // ==================== MQTT 云同步 ====================
+    // ==================== MQTT 云同步 (任务15: 冲突处理) ====================
 
     const syncEnabled = ref(false);
     const lastSyncTime = ref(null);
     const isSyncing = ref(false);
-    const syncStatus = ref("connecting"); // connecting | online | offline
+    const syncStatus = ref("connecting");
     let mqttClient = null;
     let applyingServerData = false;
     let syncTimer = null;
     let lastPublishTime = 0;
+    let localDataVersion = Date.now(); // 本地数据版本号
 
     const MQTT_CONFIG = {
       brokers: [
@@ -926,51 +1190,106 @@ createApp({
       clientId: "baige_" + Math.random().toString(16).substr(2, 8)
     };
 
-    // 检查是否正在编辑
     const isEditing = computed(() => {
       return showTaskModal.value || showExpenseModal.value ||
-             showStageModal.value || showPhotoDetail.value || showPhotoUpload.value;
+             showStageModal.value || showPhotoDetail.value || showPhotoUpload.value ||
+             showProjectModal.value || showBudgetEditModal.value || showCategoryModal.value ||
+             showLogModal.value;
     });
 
-    // 应用云端数据到本地
+    // 冲突处理：基于版本号合并数据
     function applyServerData(data) {
       if (!data) return;
+
+      // 版本号对比：只有更新的数据才应用
+      const serverVersion = data.timestamp || data._version || 0;
+      if (serverVersion && serverVersion <= localDataVersion) {
+        console.log("[MQTT] 服务器数据版本较旧，跳过");
+        return;
+      }
+
       applyingServerData = true;
-      if (data.project) Object.assign(project, data.project);
-      if (data.stages) stages.splice(0, stages.length, ...data.stages);
+
+      // 智能合并：保留本地正在编辑的数据
+      if (data.project) {
+        Object.keys(data.project).forEach(k => {
+          if (!(isEditing.value && k === "totalBudget")) {
+            project[k] = data.project[k];
+          }
+        });
+      }
+
+      if (data.stages) {
+        // 合并策略：以服务器为准，但保留本地验收状态
+        const localAcceptedMap = {};
+        stages.forEach(s => {
+          if (s.acceptedItems && s.acceptedItems.length > 0) {
+            localAcceptedMap[s.id] = s.acceptedItems;
+          }
+        });
+        data.stages.forEach(s => {
+          if (localAcceptedMap[s.id] && (!s.acceptedItems || s.acceptedItems.length === 0)) {
+            s.acceptedItems = localAcceptedMap[s.id];
+          }
+        });
+        stages.splice(0, stages.length, ...data.stages);
+      }
+
       if (data.tasks) tasks.splice(0, tasks.length, ...data.tasks);
       if (data.budget) budget.splice(0, budget.length, ...data.budget);
-      if (data.photos) photos.splice(0, photos.length, ...data.photos);
+
+      // 照片合并：取并集，避免丢照片
+      if (data.photos) {
+        const localIds = new Set(photos.map(p => p.id));
+        const newPhotos = data.photos.filter(p => !localIds.has(p.id));
+        if (newPhotos.length > 0) {
+          photos.splice(0, photos.length, ...data.photos);
+        }
+      }
+
+      // 日志合并
+      if (data.logs) {
+        const localLogIds = new Set(logs.map(l => l.id));
+        const newLogs = data.logs.filter(l => !localLogIds.has(l.id));
+        if (newLogs.length > 0) {
+          logs.splice(0, logs.length, ...data.logs);
+          logs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          if (logs.length > 200) logs.splice(200);
+        }
+      }
+
+      localDataVersion = serverVersion || Date.now();
       lastSyncTime.value = new Date();
       saveAll();
       nextTick(() => { applyingServerData = false; });
     }
 
-    // 发布数据到 MQTT
     function publishData() {
       if (!mqttClient || !mqttClient.connected) return;
       if (applyingServerData) return;
+      if (isEditing.value) return;
 
+      localDataVersion = Date.now();
       const data = {
         project: JSON.parse(JSON.stringify(project)),
         stages: JSON.parse(JSON.stringify(stages)),
         tasks: JSON.parse(JSON.stringify(tasks)),
         budget: JSON.parse(JSON.stringify(budget)),
         photos: JSON.parse(JSON.stringify(photos)),
-        timestamp: Date.now()
+        logs: JSON.parse(JSON.stringify(logs)).slice(0, 100),
+        timestamp: localDataVersion
       };
 
       try {
         const msg = JSON.stringify(data);
-        // 消息过大时只同步文本数据（不含照片）
         if (msg.length > 3 * 1024 * 1024) {
-          console.log("[MQTT] 数据较大，仅同步文本数据");
+          console.log("[MQTT] 数据较大，仅同步文本数据（不含照片）");
           const lightData = Object.assign({}, data, { photos: [] });
           mqttClient.publish(MQTT_CONFIG.topic, JSON.stringify(lightData), { qos: 0, retain: true });
         } else {
           mqttClient.publish(MQTT_CONFIG.topic, msg, { qos: 0, retain: true });
         }
-        lastPublishTime = Date.now();
+        lastPublishTime = localDataVersion;
         lastSyncTime.value = new Date();
         syncStatus.value = "online";
       } catch (e) {
@@ -978,14 +1297,12 @@ createApp({
       }
     }
 
-    // 防抖同步
     function debouncedSync() {
       if (applyingServerData) return;
       if (syncTimer) clearTimeout(syncTimer);
       syncTimer = setTimeout(() => publishData(), 1500);
     }
 
-    // 初始化 MQTT — 多服务器自动切换
     let brokerIndex = 0;
     let connectTimeoutTimer = null;
 
@@ -1000,7 +1317,6 @@ createApp({
       console.log("[MQTT] 尝试连接:", brokerUrl);
       syncStatus.value = "connecting";
 
-      // 清理旧连接
       if (mqttClient) {
         try { mqttClient.end(true); } catch(e) {}
         mqttClient = null;
@@ -1011,7 +1327,7 @@ createApp({
           clientId: MQTT_CONFIG.clientId + "_" + brokerIndex,
           clean: true,
           connectTimeout: 5000,
-          reconnectPeriod: 0  // 关闭自动重连，手动切换服务器
+          reconnectPeriod: 0
         });
 
         mqttClient.on("connect", () => {
@@ -1045,21 +1361,17 @@ createApp({
 
         mqttClient.on("close", () => {
           if (syncStatus.value === "online") {
-            console.log("[MQTT] 连接断开，尝试重连当前服务器");
+            console.log("[MQTT] 连接断开，尝试重连");
             syncStatus.value = "connecting";
-            // 重连当前服务器
             setTimeout(() => {
               if (syncStatus.value !== "online" && mqttClient) {
                 try { mqttClient.end(true); } catch(e) {}
-                // 尝试重连当前 broker，失败则切换到下一个
-                brokerIndex = Math.max(0, brokerIndex); // 保持当前 index
                 reconnectCurrent();
               }
             }, 2000);
           }
         });
 
-        // 6秒超时，切换到下一个服务器
         connectTimeoutTimer = setTimeout(() => {
           if (syncStatus.value === "connecting") {
             console.log("[MQTT] 超时，切换下一个服务器");
@@ -1075,7 +1387,6 @@ createApp({
       }
     }
 
-    // 重连当前 broker
     function reconnectCurrent() {
       const brokerUrl = MQTT_CONFIG.brokers[brokerIndex];
       console.log("[MQTT] 重连:", brokerUrl);
@@ -1134,8 +1445,6 @@ createApp({
         return;
       }
       tryConnectBroker();
-
-      // 总超时：30秒后如果还连不上，标记离线
       setTimeout(() => {
         if (syncStatus.value === "connecting") {
           syncStatus.value = "offline";
@@ -1144,7 +1453,6 @@ createApp({
       }, 30000);
     }
 
-    // 手动重试连接
     function retryConnect() {
       console.log("[MQTT] 手动重试连接");
       if (mqttClient) {
@@ -1166,6 +1474,7 @@ createApp({
         tasks: JSON.parse(JSON.stringify(tasks)),
         budget: JSON.parse(JSON.stringify(budget)),
         photos: JSON.parse(JSON.stringify(photos)),
+        logs: JSON.parse(JSON.stringify(logs)),
         exportDate: new Date().toISOString()
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -1175,6 +1484,7 @@ createApp({
       a.download = "装修数据_" + todayStr() + ".json";
       a.click();
       URL.revokeObjectURL(url);
+      addLog("sync", "导出数据");
       showToast("数据已导出");
     }
 
@@ -1192,11 +1502,13 @@ createApp({
           if (data.tasks) tasks.splice(0, tasks.length, ...data.tasks);
           if (data.budget) budget.splice(0, budget.length, ...data.budget);
           if (data.photos) photos.splice(0, photos.length, ...data.photos);
+          if (data.logs) logs.splice(0, logs.length, ...data.logs);
           nextTick(() => {
             applyingServerData = false;
             saveAll();
             publishData();
           });
+          addLog("sync", "导入数据");
           showToast("导入成功");
         } catch (err) {
           showToast("导入失败：格式错误");
@@ -1206,26 +1518,31 @@ createApp({
       e.target.value = "";
     }
 
-    // ---- 自动保存（数据变化时）----
+    // ---- 自动保存 ----
     watch([project, stages, tasks, budget, photos], () => {
       saveAll();
       debouncedSync();
     }, { deep: true });
 
-    // ---- 启动同步 ----
+    // ---- 启动 ----
     onMounted(() => {
+      checkDelayed();
       initMQTT();
+      // 每分钟检查一次延期
+      setInterval(checkDelayed, 60000);
     });
 
     // ==================== 返回 ====================
 
     return {
       // 数据
-      project, stages, tasks, budget, photos,
+      project, stages, tasks, budget, photos, logs,
       currentTab, tabs, navTitle, currentTime,
       progressRingSize, progressRingRadius, ringCircumference,
-      // 筛选
-      scheduleFilter, filteredTasks, photoFilter, filteredPhotos,
+      isDesktop,
+      // 筛选+搜索
+      scheduleFilter, filteredTasks, searchQuery,
+      photoFilter, filteredPhotos, photoViewMode,
       // 弹窗状态
       showTaskModal, editingTask,
       showExpenseModal, editingExpense,
@@ -1234,20 +1551,27 @@ createApp({
       showStageModal, editingStage, openAddStageModal, deleteStage,
       showPhotoDetail, viewingPhoto,
       showPhotoUpload, newPhoto, photoInput,
+      showLogModal, showCategoryModal, newCategoryName,
       toastMessage,
       // 计算属性
       overallProgress, daysElapsed, daysRemaining, completedStages,
+      delayedCount,
       currentStage, totalSpent, remainingBudget, budgetProgress,
       totalAllocatedBudget,
       budgetCategories, categoryNames, recentPhotos, upcomingTasks,
+      todayAlerts, stageBudgets, groupedPhotos,
       // 方法
-      statusText, formatMoney,
+      statusText, formatMoney, formatLogAction,
       openTaskModal, saveTask, deleteTask, startTask, completeTask,
-      openExpenseModal, saveExpense,
+      openExpenseModal, saveExpense, deleteExpense,
+      openCategoryModal, addCategory, deleteCategory,
       openStageModal, saveStage, startStage, completeStage,
-      triggerPhotoUpload, handlePhotoUpload, savePhoto,
+      triggerPhotoUpload, handlePhotoUpload, savePhoto, skipPhoto,
       openPhotoDetail, savePhotoDescription, deletePhoto,
       showToast,
+      // 验收
+      getAcceptanceItems, toggleAcceptance, isAccepted, getAcceptanceProgress,
+      getStageBudget,
       // 同步状态
       syncStatus, lastSyncTime, isSyncing, retryConnect,
       // 导出导入
@@ -1257,7 +1581,9 @@ createApp({
       onMouseDragStart, onStageClick,
       // 拖拽排序 - 工期
       taskDragState, onTaskDragStart, onTaskDragMove, onTaskDragEnd,
-      onMouseTaskDragStart, onTaskClick
+      onMouseTaskDragStart, onTaskClick,
+      // 延期
+      getEffectiveStatus, isOverdue
     };
   }
 }).mount("#app");
