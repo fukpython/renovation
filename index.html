@@ -55,11 +55,11 @@
         </div>
         <!-- 进度环 -->
         <div class="progress-ring-wrap">
-          <svg class="progress-ring" width="80" height="80">
-            <circle cx="40" cy="40" r="34" stroke="#ffffff" stroke-width="6" fill="none" opacity="0.3"/>
-            <circle cx="40" cy="40" r="34" stroke="#ffffff" stroke-width="6" fill="none"
-              :stroke-dasharray="214" :stroke-dashoffset="214 - 214 * overallProgress / 100"
-              stroke-linecap="round" transform="rotate(-90 40 40)" class="progress-ring-circle"/>
+          <svg class="progress-ring" :width="progressRingSize" :height="progressRingSize">
+            <circle :cx="progressRingRadius" :cy="progressRingRadius" :r="progressRingRadius - 6" stroke="#ffffff" stroke-width="6" fill="none" opacity="0.3"/>
+            <circle :cx="progressRingRadius" :cy="progressRingRadius" :r="progressRingRadius - 6" stroke="#ffffff" stroke-width="6" fill="none"
+              :stroke-dasharray="ringCircumference" :stroke-dashoffset="ringCircumference - ringCircumference * overallProgress / 100"
+              stroke-linecap="round" :transform="'rotate(-90 ' + progressRingRadius + ' ' + progressRingRadius + ')'" class="progress-ring-circle"/>
           </svg>
           <div class="progress-ring-text">
             <div class="progress-percent">{{ overallProgress }}%</div>
