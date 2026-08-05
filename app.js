@@ -18,21 +18,26 @@ const DEFAULT_DATA = {
   stages: [
     { id: 1, name: "设计确认", startDate: "2026-08-10", endDate: "2026-08-15", status: "pending", contractor: "", notes: "" },
     { id: 2, name: "主体拆改", startDate: "2026-08-16", endDate: "2026-08-22", status: "pending", contractor: "", notes: "" },
-    { id: 3, name: "水电改造", startDate: "2026-08-23", endDate: "2026-09-05", status: "pending", contractor: "", notes: "" },
-    { id: 4, name: "泥瓦工程", startDate: "2026-09-06", endDate: "2026-09-25", status: "pending", contractor: "", notes: "" },
-    { id: 5, name: "木工工程", startDate: "2026-09-26", endDate: "2026-10-15", status: "pending", contractor: "", notes: "" },
-    { id: 6, name: "油漆工程", startDate: "2026-10-16", endDate: "2026-11-05", status: "pending", contractor: "", notes: "" },
-    { id: 7, name: "安装工程", startDate: "2026-11-06", endDate: "2026-11-25", status: "pending", contractor: "", notes: "" },
-    { id: 8, name: "软装入住", startDate: "2026-11-26", endDate: "2026-12-20", status: "pending", contractor: "", notes: "" }
+    { id: 3, name: "阳台封窗", startDate: "2026-08-23", endDate: "2026-08-30", status: "pending", contractor: "", notes: "" },
+    { id: 4, name: "水电改造", startDate: "2026-08-31", endDate: "2026-09-10", status: "pending", contractor: "", notes: "" },
+    { id: 5, name: "泥瓦工程", startDate: "2026-09-11", endDate: "2026-09-30", status: "pending", contractor: "", notes: "" },
+    { id: 6, name: "木工工程", startDate: "2026-10-01", endDate: "2026-10-15", status: "pending", contractor: "", notes: "" },
+    { id: 7, name: "油漆工程", startDate: "2026-10-16", endDate: "2026-11-05", status: "pending", contractor: "", notes: "" },
+    { id: 8, name: "全屋定制", startDate: "2026-11-06", endDate: "2026-11-20", status: "pending", contractor: "", notes: "" },
+    { id: 9, name: "安装工程", startDate: "2026-11-21", endDate: "2026-12-05", status: "pending", contractor: "", notes: "" },
+    { id: 10, name: "软装入住", startDate: "2026-12-06", endDate: "2026-12-20", status: "pending", contractor: "", notes: "" }
   ],
   tasks: [
     { id: 1, name: "户型测量与设计方案", stage: "设计确认", startDate: "2026-08-10", endDate: "2026-08-13", status: "pending", progress: 0 },
     { id: 2, name: "设计方案确认定稿", stage: "设计确认", startDate: "2026-08-14", endDate: "2026-08-15", status: "pending", progress: 0 },
     { id: 3, name: "墙体拆除", stage: "主体拆改", startDate: "2026-08-16", endDate: "2026-08-19", status: "pending", progress: 0 },
     { id: 4, name: "垃圾清运", stage: "主体拆改", startDate: "2026-08-20", endDate: "2026-08-22", status: "pending", progress: 0 },
-    { id: 5, name: "水电交底", stage: "水电改造", startDate: "2026-08-23", endDate: "2026-08-24", status: "pending", progress: 0 },
-    { id: 6, name: "水电走线施工", stage: "水电改造", startDate: "2026-08-25", endDate: "2026-09-03", status: "pending", progress: 0 },
-    { id: 7, name: "水电验收", stage: "水电改造", startDate: "2026-09-04", endDate: "2026-09-05", status: "pending", progress: 0 }
+    { id: 5, name: "阳台封窗测量安装", stage: "阳台封窗", startDate: "2026-08-23", endDate: "2026-08-30", status: "pending", progress: 0 },
+    { id: 6, name: "水电交底", stage: "水电改造", startDate: "2026-08-31", endDate: "2026-09-01", status: "pending", progress: 0 },
+    { id: 7, name: "水电走线施工", stage: "水电改造", startDate: "2026-09-02", endDate: "2026-09-08", status: "pending", progress: 0 },
+    { id: 8, name: "水电验收", stage: "水电改造", startDate: "2026-09-09", endDate: "2026-09-10", status: "pending", progress: 0 },
+    { id: 9, name: "全屋定制复尺", stage: "全屋定制", startDate: "2026-11-06", endDate: "2026-11-10", status: "pending", progress: 0 },
+    { id: 10, name: "全屋定制安装", stage: "全屋定制", startDate: "2026-11-11", endDate: "2026-11-20", status: "pending", progress: 0 }
   ],
   budget: [
     { id: 1, category: "设计费", item: "设计费", budgetAmount: 10000, actualAmount: 0 },
@@ -40,14 +45,16 @@ const DEFAULT_DATA = {
     { id: 3, category: "基础施工", item: "泥瓦工程", budgetAmount: 20000, actualAmount: 0 },
     { id: 4, category: "基础施工", item: "木工工程", budgetAmount: 15000, actualAmount: 0 },
     { id: 5, category: "基础施工", item: "油漆工程", budgetAmount: 10000, actualAmount: 0 },
-    { id: 6, category: "主材", item: "瓷砖", budgetAmount: 20000, actualAmount: 0 },
-    { id: 7, category: "主材", item: "地板", budgetAmount: 15000, actualAmount: 0 },
-    { id: 8, category: "主材", item: "门窗", budgetAmount: 15000, actualAmount: 0 },
-    { id: 9, category: "主材", item: "橱柜", budgetAmount: 20000, actualAmount: 0 },
-    { id: 10, category: "主材", item: "卫浴洁具", budgetAmount: 10000, actualAmount: 0 },
-    { id: 11, category: "家电", item: "家电", budgetAmount: 50000, actualAmount: 0 },
-    { id: 12, category: "家具", item: "家具", budgetAmount: 35000, actualAmount: 0 },
-    { id: 13, category: "软装", item: "软装布置", budgetAmount: 15000, actualAmount: 0 }
+    { id: 6, category: "门窗", item: "阳台封窗", budgetAmount: 12000, actualAmount: 0 },
+    { id: 7, category: "主材", item: "瓷砖", budgetAmount: 20000, actualAmount: 0 },
+    { id: 8, category: "主材", item: "地板", budgetAmount: 15000, actualAmount: 0 },
+    { id: 9, category: "主材", item: "门窗", budgetAmount: 15000, actualAmount: 0 },
+    { id: 10, category: "主材", item: "橱柜", budgetAmount: 20000, actualAmount: 0 },
+    { id: 11, category: "主材", item: "卫浴洁具", budgetAmount: 10000, actualAmount: 0 },
+    { id: 12, category: "全屋定制", item: "全屋定制", budgetAmount: 40000, actualAmount: 0 },
+    { id: 13, category: "家电", item: "家电", budgetAmount: 50000, actualAmount: 0 },
+    { id: 14, category: "家具", item: "家具", budgetAmount: 35000, actualAmount: 0 },
+    { id: 15, category: "软装", item: "软装布置", budgetAmount: 15000, actualAmount: 0 }
   ],
   photos: []
 };
@@ -55,23 +62,73 @@ const DEFAULT_DATA = {
 /* ===================== 数据持久化 ===================== */
 
 const STORAGE_KEY = "renovation_app_data";
+const DATA_VERSION = 2; // v2: 新增阳台封窗、全屋定制阶段
 
 function loadData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
+      const version = parsed._version || 1;
+
       // 合并默认数据，防止字段缺失
-      return Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
+      const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
+
+      // v1 → v2 迁移：插入新阶段
+      if (version < 2) {
+        const newStageNames = ["阳台封窗", "全屋定制"];
+        const existingNames = (merged.stages || []).map(s => s.name);
+        const defaultStages = DEFAULT_DATA.stages;
+
+        // 按默认顺序重建 stages 数组
+        const reordered = [];
+        for (const ds of defaultStages) {
+          if (existingNames.includes(ds.name)) {
+            // 用已有的数据
+            const existing = merged.stages.find(s => s.name === ds.name);
+            reordered.push(existing);
+          } else {
+            // 新阶段，用默认数据
+            reordered.push(JSON.parse(JSON.stringify(ds)));
+          }
+        }
+        merged.stages = reordered;
+
+        // 合并新预算项
+        const existingBudgetItems = (merged.budget || []).map(b => b.item);
+        for (const db of DEFAULT_DATA.budget) {
+          if (!existingBudgetItems.includes(db.item)) {
+            merged.budget.push(JSON.parse(JSON.stringify(db)));
+          }
+        }
+
+        // 合并新任务
+        const existingTaskNames = (merged.tasks || []).map(t => t.name);
+        for (const dt of DEFAULT_DATA.tasks) {
+          if (!existingTaskNames.includes(dt.name)) {
+            merged.tasks.push(JSON.parse(JSON.stringify(dt)));
+          }
+        }
+
+        merged._version = DATA_VERSION;
+        // 保存迁移后的数据
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        console.log("[迁移] 数据已从 v1 升级到 v2");
+      }
+
+      return merged;
     }
   } catch (e) {
     console.error("加载数据失败:", e);
   }
-  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+  const fresh = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  fresh._version = DATA_VERSION;
+  return fresh;
 }
 
 function saveData(data) {
   try {
+    data._version = DATA_VERSION;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error("保存数据失败:", e);
@@ -372,14 +429,48 @@ createApp({
       showStageModal.value = true;
     }
 
+    function openAddStageModal() {
+      Object.assign(editingStage, {
+        id: null, name: "", startDate: "", endDate: "", status: "pending", contractor: "", notes: ""
+      });
+      showStageModal.value = true;
+    }
+
     function saveStage() {
-      const idx = stages.findIndex(s => s.id === editingStage.id);
-      if (idx > -1) {
-        Object.assign(stages[idx], JSON.parse(JSON.stringify(editingStage)));
+      if (!editingStage.name.trim()) {
+        showToast("请填写阶段名称");
+        return;
+      }
+      if (editingStage.id) {
+        // 编辑已有阶段
+        const idx = stages.findIndex(s => s.id === editingStage.id);
+        if (idx > -1) {
+          // 如果改了名字，同步更新任务和照片中的阶段名
+          const oldName = stages[idx].name;
+          if (oldName !== editingStage.name) {
+            tasks.forEach(t => { if (t.stage === oldName) t.stage = editingStage.name; });
+            photos.forEach(p => { if (p.stage === oldName) p.stage = editingStage.name; });
+          }
+          Object.assign(stages[idx], JSON.parse(JSON.stringify(editingStage)));
+        }
+      } else {
+        // 新增阶段
+        const maxId = stages.length > 0 ? Math.max(...stages.map(s => s.id)) : 0;
+        stages.push(Object.assign({}, JSON.parse(JSON.stringify(editingStage)), { id: maxId + 1 }));
       }
       showStageModal.value = false;
       saveAll();
-      showToast("已保存");
+      showToast(editingStage.id ? "已保存" : "已添加");
+    }
+
+    function deleteStage(stage) {
+      if (!confirm(`确定删除「${stage.name}」吗？关联的任务不会删除，但会失去阶段归属。`)) return;
+      const idx = stages.findIndex(s => s.id === stage.id);
+      if (idx > -1) {
+        stages.splice(idx, 1);
+        saveAll();
+        showToast("已删除");
+      }
     }
 
     function startStage(stage) {
@@ -849,7 +940,7 @@ createApp({
       // 弹窗状态
       showTaskModal, editingTask,
       showExpenseModal, editingExpense,
-      showStageModal, editingStage,
+      showStageModal, editingStage, openAddStageModal, deleteStage,
       showPhotoDetail, viewingPhoto,
       showPhotoUpload, newPhoto, photoInput,
       toastMessage,
